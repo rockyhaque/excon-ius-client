@@ -131,13 +131,13 @@ export function ExamsPanel() {
     }
 
     const payload = {
-      dept_id: Number(dep.id),
+      dept_id: dep.id,
       dept: dep.name,
-      batch_id: Number(batch.id),
+      batch_id: batch.id,
       batch: String(batch.name ?? batch.number ?? ""),
-      section_id: Number(section.id),
+      section_id: section.id,
       section: section.name,
-      course_id: Number(course.id),
+      course_id: course.id,
       course_name: course.name,
       course_code: course.code,
       exam_date: examDate,

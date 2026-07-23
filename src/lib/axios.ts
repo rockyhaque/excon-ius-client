@@ -33,8 +33,14 @@ axiosInstance.interceptors.response.use(
     const status = error?.response?.status;
     const originalRequest = error.config as AxiosRequestConfig & { _retry?: boolean };
 
+    // A 401 from the auth endpoints themselves means "bad credentials / no session",
+    // NOT an expired access token — so don't try to refresh & retry (that just masks the
+    // real "Invalid credentials" message behind a confusing refresh failure).
+    const reqUrl = String(originalRequest?.url ?? "");
+    const isAuthEndpoint = /\/auth\/(login|register|refresh|logout)/.test(reqUrl);
+
     // If access token expired/invalid -> refresh using refreshToken cookie and retry
-    if (status === 401 && !originalRequest?._retry) {
+    if (status === 401 && !originalRequest?._retry && !isAuthEndpoint) {
       originalRequest._retry = true;
 
       if (isRefreshing) {

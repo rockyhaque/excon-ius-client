@@ -61,7 +61,7 @@ export function SectionsPanel() {
       return;
     }
     try {
-      const payload = { batch_id: Number(batchId), name: name.trim() };
+      const payload = { batch_id: batchId, name: name.trim() };
       if (editing) await updateSection({ id: editing.id, data: payload }).unwrap();
       else await createSection(payload).unwrap();
       setOpen(false);

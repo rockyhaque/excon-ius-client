@@ -21,7 +21,7 @@ export const allocationsApi = baseApi.injectEndpoints({
     }),
     editAllocation: builder.mutation<
       unknown,
-      { id: string | number; body: { teacher_id: string; room_id: number } }
+      { id: string | number; body: { teacher_id: string; room_id: string } }
     >({
       query: ({ id, body }) => ({ url: `/allocations/${id}`, method: "PUT", data: body }),
       invalidatesTags: ["ALLOCATIONS"],

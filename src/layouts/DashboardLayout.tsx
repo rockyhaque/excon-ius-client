@@ -10,7 +10,11 @@ export function DashboardLayout({ title, items }: { title: string; items: Sideba
   const { isAuthenticated, logout } = useAuth();
 
   const onLogout = async () => {
-    await logout();
+    try {
+      await logout();
+    } catch {
+      // Logout is best-effort — a network error shouldn't trap the user in the dashboard.
+    }
     navigate("/login", { replace: true });
   };
 

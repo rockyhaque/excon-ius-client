@@ -64,7 +64,7 @@ export function CoursesPanel() {
       return;
     }
     try {
-      const payload = { dept_id: Number(deptId), name: name.trim(), code: code.trim() };
+      const payload = { dept_id: deptId, name: name.trim(), code: code.trim() };
       if (editing) await updateCourse({ id: editing.id, data: payload }).unwrap();
       else await createCourse(payload).unwrap();
       setOpen(false);

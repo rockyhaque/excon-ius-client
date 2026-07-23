@@ -5,6 +5,12 @@ function asNum(v: unknown): number {
   return Number.isFinite(n) ? n : 0;
 }
 
+// IDs are UUID strings — never coerce them to Number (that yields NaN → 0, colliding keys).
+function asId(v: unknown): string {
+  if (v == null) return "";
+  return String(v);
+}
+
 function asBool(v: unknown): boolean {
   if (typeof v === "boolean") return v;
   if (typeof v === "number") return v !== 0;
@@ -26,7 +32,7 @@ function toRowArray(input: unknown): ExamRoomEntity[] {
 
 export function mapRooms(rows: unknown): Room[] {
   return toRowArray(rows).map((r) => ({
-    id: asNum(r.id),
+    id: asId(r.id),
     name: safeStr(r.name),
     building: safeStr(r.building),
     capacity: asNum(r.capacity),
@@ -36,15 +42,15 @@ export function mapRooms(rows: unknown): Room[] {
 
 export function mapExams(rows: unknown): Exam[] {
   return toRowArray(rows).map((e) => ({
-    id: asNum(e.id),
-    course_id: asNum((e as any).course_id),
+    id: asId(e.id),
+    course_id: asId((e as any).course_id),
     course_name: safeStr((e as any).course_name),
     course_code: safeStr((e as any).course_code),
-    dept_id: asNum((e as any).dept_id),
+    dept_id: asId((e as any).dept_id),
     dept: safeStr((e as any).dept),
-    batch_id: asNum((e as any).batch_id),
+    batch_id: asId((e as any).batch_id),
     batch: safeStr((e as any).batch),
-    section_id: asNum((e as any).section_id),
+    section_id: asId((e as any).section_id),
     section: safeStr((e as any).section),
     exam_date: safeStr((e as any).exam_date),
     start_time: safeStr((e as any).start_time),

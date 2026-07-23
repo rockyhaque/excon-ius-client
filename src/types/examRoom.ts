@@ -1,7 +1,7 @@
 export type ExamRoomEntity = Record<string, unknown> & { id?: number | string };
 
 export type Room = {
-  id: number;
+  id: string;
   name: string;
   building: string;
   capacity: number;
@@ -9,15 +9,15 @@ export type Room = {
 };
 
 export type Exam = {
-  id: number;
-  course_id: number;
+  id: string;
+  course_id: string;
   course_name: string;
   course_code: string;
-  dept_id: number;
+  dept_id: string;
   dept: string;
-  batch_id: number;
+  batch_id: string;
   batch: string;
-  section_id: number;
+  section_id: string;
   section: string;
   exam_date: string;
   start_time: string;

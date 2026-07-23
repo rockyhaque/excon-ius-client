@@ -1,0 +1,123 @@
+/* Admin / Super-Admin overview dashboard */
+
+.ov {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  min-width: 0;
+}
+
+.ov__head { display: flex; flex-direction: column; gap: 4px; }
+.ov__title { margin: 0; font-size: 1.5rem; color: #111827; }
+.ov__lead { margin: 0; color: #4b5563; }
+
+/* ── KPI row ─────────────────────────────────────────────── */
+.ov-kpis {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(auto-fill, minmax(148px, 1fr));
+}
+.ov-kpi {
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  padding: 14px 16px;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+}
+.ov-kpi__label {
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #6b7280;
+  margin-bottom: 8px;
+  line-height: 1.3;
+}
+.ov-kpi__value { font-size: 1.7rem; font-weight: 800; color: #111827; line-height: 1.1; }
+
+/* ── Chart grid ──────────────────────────────────────────── */
+.ov-grid {
+  display: grid;
+  gap: 14px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+.ov-card {
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 14px;
+  padding: 16px 18px;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.ov-card--wide { grid-column: 1 / -1; }
+.ov-card__head { display: flex; flex-direction: column; gap: 2px; }
+.ov-card__title { margin: 0; font-size: 1rem; color: #111827; }
+.ov-card__sub { margin: 0; font-size: 0.82rem; color: #6b7280; }
+.ov-card__body { min-width: 0; overflow: hidden; }
+
+.ov-chart__empty {
+  padding: 24px 12px;
+  text-align: center;
+  color: #9ca3af;
+  font-size: 0.9rem;
+}
+
+/* ── Donut ───────────────────────────────────────────────── */
+.ov-donut { display: flex; align-items: center; gap: 18px; flex-wrap: wrap; }
+.ov-donut__total { font-size: 1.6rem; font-weight: 800; fill: #111827; }
+.ov-donut__caption { font-size: 0.72rem; fill: #6b7280; text-transform: uppercase; letter-spacing: 0.04em; }
+.ov-legend { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; min-width: 120px; }
+.ov-legend li { display: flex; align-items: center; gap: 8px; font-size: 0.88rem; color: #4b5563; }
+.ov-legend__dot { width: 11px; height: 11px; border-radius: 3px; flex: none; }
+.ov-legend__label { flex: 1; }
+.ov-legend__value { font-weight: 800; color: #111827; font-variant-numeric: tabular-nums; }
+
+/* ── Horizontal bars ─────────────────────────────────────── */
+.ov-bars { display: flex; flex-direction: column; gap: 10px; }
+.ov-bars__row {
+  display: grid;
+  grid-template-columns: minmax(84px, 30%) 1fr auto;
+  align-items: center;
+  gap: 10px;
+}
+.ov-bars__label {
+  font-size: 0.85rem;
+  color: #374151;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.ov-bars__sub { color: #9ca3af; font-size: 0.78rem; }
+.ov-bars__track { background: #f1f3f5; border-radius: 5px; height: 12px; overflow: hidden; }
+.ov-bars__fill { height: 100%; border-radius: 4px; min-width: 2px; transition: width 0.3s ease; }
+.ov-bars__value { font-weight: 800; color: #111827; font-size: 0.85rem; font-variant-numeric: tabular-nums; min-width: 24px; text-align: right; }
+
+/* ── Area ────────────────────────────────────────────────── */
+.ov-area { display: block; max-width: 100%; }
+.ov-axis { font-size: 11px; fill: #898781; }
+
+/* ── Activity feed ───────────────────────────────────────── */
+.ov-activity { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
+.ov-activity li {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 2px;
+  border-bottom: 1px solid #f3f4f6;
+}
+.ov-activity li:last-child { border-bottom: none; }
+.ov-activity__dot { width: 8px; height: 8px; border-radius: 999px; background: #2a78d6; flex: none; }
+.ov-activity__action { font-weight: 600; color: #111827; font-size: 0.88rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ov-activity__meta { color: #6b7280; font-size: 0.8rem; white-space: nowrap; }
+
+@media (max-width: 760px) {
+  .ov-grid { grid-template-columns: minmax(0, 1fr); }
+  .ov-activity li { grid-template-columns: auto 1fr; }
+  .ov-activity__meta { grid-column: 2; }
+}

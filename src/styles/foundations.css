@@ -274,6 +274,63 @@
   flex-wrap: wrap;
 }
 
+/* Stat tiles (allocation summary, etc.) */
+.foundations__stats {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  margin: 4px 0 12px;
+}
+
+.foundations__stat {
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  padding: 12px 14px;
+}
+
+.foundations__stat-label {
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #6b7280;
+  margin-bottom: 6px;
+}
+
+.foundations__stat-value {
+  font-size: 1.4rem;
+  font-weight: 800;
+  color: #111827;
+  line-height: 1.2;
+}
+
+/* Activity-log details — humanized label/value chips */
+.log-detail {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px 16px;
+}
+.log-detail__item {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 6px;
+  font-size: 0.85rem;
+  min-width: 0;
+}
+.log-detail__key {
+  font-size: 0.68rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: #6b7280;
+  white-space: nowrap;
+}
+.log-detail__val {
+  color: #111827;
+  font-weight: 600;
+}
+
 /* Modal */
 .modal {
   position: fixed;
