@@ -1,7 +1,9 @@
 import { useMemo, useState } from "react";
 import { toast } from "react-toastify";
+import "@/styles/overview.css";
 import { Modal } from "@/components/ui/Modal";
 import { IconEdit, IconTrash } from "@/components/ui/Icons";
+import { DonutChart, ChartCard, VIZ } from "@/components/overview/charts";
 import { getErrorMessage } from "@/utils/getErrorMessage";
 import {
   useCreateAdminMutation,
@@ -27,11 +29,14 @@ function asBool(v: unknown) {
 }
 
 export function Admins() {
-  const { data: allUsers = [], isLoading, error } = useGetAllUsersQuery({ role: "ADMIN", limit: 1000 });
+  const { data: allUsers = [], isLoading, error } = useGetAllUsersQuery({ role: "ADMIN", limit: 100 });
   const rows: AdminRow[] = useMemo(() => {
     const list = Array.isArray(allUsers) ? allUsers : [];
     return list.filter((u) => String(u.role || "").toUpperCase() === "ADMIN") as AdminRow[];
   }, [allUsers]);
+
+  const activeCount = useMemo(() => rows.filter((u) => asBool((u as any).is_active ?? true)).length, [rows]);
+  const inactiveCount = rows.length - activeCount;
 
   const [createAdmin, { isLoading: creating }] = useCreateAdminMutation();
   const [updateAdmin, { isLoading: updating }] = useUpdateAdminMutation();
@@ -127,6 +132,33 @@ export function Admins() {
             <h1 style={{ margin: 0 }}>Admins</h1>
             <p className="foundations__lead">Create and manage departmental admins (SUPER_ADMIN only).</p>
           </div>
+        </div>
+
+        <div className="foundations__stats">
+          <div className="foundations__stat">
+            <div className="foundations__stat-label">Total admins</div>
+            <div className="foundations__stat-value">{rows.length}</div>
+          </div>
+          <div className="foundations__stat">
+            <div className="foundations__stat-label">Active</div>
+            <div className="foundations__stat-value">{activeCount}</div>
+          </div>
+          <div className="foundations__stat">
+            <div className="foundations__stat-label">Inactive</div>
+            <div className="foundations__stat-value">{inactiveCount}</div>
+          </div>
+        </div>
+
+        <div style={{ maxWidth: 360, margin: "0 0 16px" }}>
+          <ChartCard title="Admin status" subtitle="Active vs inactive accounts">
+            <DonutChart
+              centerLabel="admins"
+              data={[
+                { label: "Active", value: activeCount, color: VIZ.good },
+                { label: "Inactive", value: inactiveCount, color: VIZ.critical },
+              ]}
+            />
+          </ChartCard>
         </div>
 
         <div className="foundations__toolbar">

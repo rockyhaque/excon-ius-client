@@ -22,5 +22,8 @@ export type Exam = {
   exam_date: string;
   start_time: string;
   end_time: string;
+  status: string;
+  expected_students: number | null;
+  semester_name: string;
 };
 

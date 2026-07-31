@@ -1,7 +1,10 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { toast } from "react-toastify";
+import "@/styles/overview.css";
 import { Modal } from "@/components/ui/Modal";
 import { IconEdit, IconTrash } from "@/components/ui/Icons";
+import { ChartCard, DonutChart, HBarList, VIZ } from "@/components/overview/charts";
+import { num, sumBy } from "@/utils/stats";
 import { getErrorMessage } from "@/utils/getErrorMessage";
 import {
   useCreateRoomMutation,
@@ -13,8 +16,25 @@ import { mapRooms } from "@/components/exam-room/examRoom.types";
 import type { Room } from "@/types/examRoom";
 
 export function RoomsPanel() {
-  const { data: rowsRaw = [], isLoading, error } = useGetRoomsQuery();
-  const rows = mapRooms(rowsRaw);
+  const { data: rowsRaw = [], isLoading, error } = useGetRoomsQuery({ limit: 100 });
+  const rows = useMemo(() => mapRooms(rowsRaw), [rowsRaw]);
+
+  // ── Stats & chart data ────────────────────────────────────────
+  const usable = useMemo(() => rows.filter((r) => !r.is_defect), [rows]);
+  const defectCount = rows.length - usable.length;
+  const totalCapacity = useMemo(() => usable.reduce((s, r) => s + num(r.capacity), 0), [usable]);
+  const capacityByBuilding = useMemo(
+    () => sumBy(usable, (r) => r.building, (r) => num(r.capacity), 8),
+    [usable],
+  );
+  const largestRooms = useMemo(
+    () =>
+      [...rows]
+        .sort((a, b) => num(b.capacity) - num(a.capacity))
+        .slice(0, 8)
+        .map((r) => ({ label: r.name || "—", value: num(r.capacity) })),
+    [rows],
+  );
 
   const [createRoom, { isLoading: creating }] = useCreateRoomMutation();
   const [updateRoom, { isLoading: updating }] = useUpdateRoomMutation();
@@ -100,6 +120,47 @@ export function RoomsPanel() {
 
       {isLoading ? <p className="foundations__muted">Loading…</p> : null}
       {error ? <p className="foundations__error">Could not load rooms.</p> : null}
+
+      {rows.length > 0 ? (
+        <>
+          <div className="ov-kpis" style={{ marginBottom: 16 }}>
+            <div className="ov-kpi">
+              <div className="ov-kpi__label">Total rooms</div>
+              <div className="ov-kpi__value">{rows.length.toLocaleString()}</div>
+            </div>
+            <div className="ov-kpi">
+              <div className="ov-kpi__label">Usable</div>
+              <div className="ov-kpi__value">{usable.length.toLocaleString()}</div>
+            </div>
+            <div className="ov-kpi">
+              <div className="ov-kpi__label">Defect</div>
+              <div className="ov-kpi__value" style={{ color: VIZ.critical }}>{defectCount.toLocaleString()}</div>
+            </div>
+            <div className="ov-kpi">
+              <div className="ov-kpi__label">Total capacity</div>
+              <div className="ov-kpi__value">{totalCapacity.toLocaleString()}</div>
+            </div>
+          </div>
+
+          <div className="ov-grid" style={{ marginBottom: 20 }}>
+            <ChartCard title="Seating capacity by building" subtitle="Total usable seats per building">
+              <HBarList data={capacityByBuilding} unit="seats" color={VIZ.orange} />
+            </ChartCard>
+            <ChartCard title="Rooms by status" subtitle="Usable vs out-of-service rooms">
+              <DonutChart
+                centerLabel="rooms"
+                data={[
+                  { label: "Usable", value: usable.length, color: VIZ.good },
+                  { label: "Defect", value: defectCount, color: VIZ.critical },
+                ]}
+              />
+            </ChartCard>
+            <ChartCard title="Largest rooms" subtitle="Top rooms by seating capacity">
+              <HBarList data={largestRooms} unit="seats" />
+            </ChartCard>
+          </div>
+        </>
+      ) : null}
 
       <div className="foundations__table-wrap">
         <table className="foundations__table">

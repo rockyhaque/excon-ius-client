@@ -1,4 +1,5 @@
 import { baseApi } from "@/redux/baseApi";
+import type { PublishedAllocationRow } from "@/types/teacher";
 
 export type RuleEntity = Record<string, unknown> & { id?: number | string };
 export type TeacherSearchRow = {
@@ -46,7 +47,7 @@ export const allocationsApi = baseApi.injectEndpoints({
         responseType: "text",
       }),
     }),
-    getPublishedAllocations: builder.query<unknown[], void>({
+    getPublishedAllocations: builder.query<PublishedAllocationRow[], void>({
       query: () => ({ url: "/allocations/published", method: "GET" }),
       providesTags: ["ALLOCATIONS"],
     }),

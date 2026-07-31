@@ -96,6 +96,10 @@ export function CoursesPanel() {
           <span className="foundations__muted" style={{ margin: 0 }}>
             Courses belong to a department.
           </span>
+          <span className="foundations__muted" style={{ margin: 0, fontWeight: 600 }}>
+            {rows.length} {rows.length === 1 ? "course" : "courses"} across{" "}
+            {new Set(rows.map((c) => c.dept_name).filter(Boolean)).size} departments
+          </span>
         </div>
         <div className="foundations__toolbar-right">
           {deptOptions.length === 0 ? <span className="foundations__muted">Create a department first.</span> : null}

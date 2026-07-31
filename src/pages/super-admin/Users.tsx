@@ -1,5 +1,8 @@
 import { useMemo, useState } from "react";
+import "@/styles/overview.css";
 import { useGetAllUsersQuery } from "@/redux/features/users/users.api";
+import { DonutChart, HBarList, ChartCard, VIZ } from "@/components/overview/charts";
+import { countBy } from "@/utils/stats";
 
 function safeStr(v: unknown) {
   if (v == null) return "";
@@ -30,6 +33,36 @@ export function Users() {
 
   const rows = useMemo(() => (Array.isArray(users) ? users : []), [users]);
 
+  // Unfiltered snapshot so header stats stay stable regardless of table filters.
+  const { data: allUsers = [] } = useGetAllUsersQuery({ limit: 100 });
+  const stats = useMemo(() => {
+    const list = Array.isArray(allUsers) ? allUsers : [];
+    const byRole = { SUPER_ADMIN: 0, ADMIN: 0, TEACHER: 0 } as Record<string, number>;
+    let active = 0, available = 0;
+    for (const u of list) {
+      const r = String(u.role ?? "").toUpperCase();
+      if (r in byRole) byRole[r]++;
+      if ((u as any).is_active !== false) active++;
+      if (asBool((u as any).is_available)) available++;
+    }
+    return {
+      total: list.length,
+      byRole,
+      active,
+      inactive: list.length - active,
+      available,
+      onLeave: list.length - available,
+    };
+  }, [allUsers]);
+
+  const roleSlices = useMemo(
+    () =>
+      countBy(Array.isArray(allUsers) ? allUsers : [], (u) => String(u.role ?? "—").toUpperCase() || "—").map(
+        (d, i) => ({ ...d, color: [VIZ.blue, VIZ.orange, VIZ.good, VIZ.warning, VIZ.critical, VIZ.neutral][i % 6] }),
+      ),
+    [allUsers],
+  );
+
   return (
     <div className="foundations">
       <div className="card foundations__card">
@@ -38,6 +71,58 @@ export function Users() {
             <h1 style={{ margin: 0 }}>All Users</h1>
             <p className="foundations__lead">Monitor system-wide users (SUPER_ADMIN only).</p>
           </div>
+        </div>
+
+        <div className="foundations__stats">
+          <div className="foundations__stat">
+            <div className="foundations__stat-label">Total users</div>
+            <div className="foundations__stat-value">{stats.total}</div>
+          </div>
+          <div className="foundations__stat">
+            <div className="foundations__stat-label">Super admins</div>
+            <div className="foundations__stat-value">{stats.byRole.SUPER_ADMIN}</div>
+          </div>
+          <div className="foundations__stat">
+            <div className="foundations__stat-label">Admins</div>
+            <div className="foundations__stat-value">{stats.byRole.ADMIN}</div>
+          </div>
+          <div className="foundations__stat">
+            <div className="foundations__stat-label">Teachers</div>
+            <div className="foundations__stat-value">{stats.byRole.TEACHER}</div>
+          </div>
+          <div className="foundations__stat">
+            <div className="foundations__stat-label">Active</div>
+            <div className="foundations__stat-value">{stats.active}</div>
+          </div>
+          <div className="foundations__stat">
+            <div className="foundations__stat-label">Inactive</div>
+            <div className="foundations__stat-value">{stats.inactive}</div>
+          </div>
+          <div className="foundations__stat">
+            <div className="foundations__stat-label">Available</div>
+            <div className="foundations__stat-value">{stats.available}</div>
+          </div>
+          <div className="foundations__stat">
+            <div className="foundations__stat-label">On leave</div>
+            <div className="foundations__stat-value">{stats.onLeave}</div>
+          </div>
+        </div>
+
+        <div
+          style={{ display: "grid", gap: 16, gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", margin: "0 0 16px" }}
+        >
+          <ChartCard title="Users by role" subtitle="System-wide account mix">
+            <DonutChart centerLabel="users" data={roleSlices} />
+          </ChartCard>
+          <ChartCard title="Account status" subtitle="Active vs inactive users">
+            <HBarList
+              data={[
+                { label: "Active", value: stats.active, color: VIZ.good },
+                { label: "Inactive", value: stats.inactive, color: VIZ.critical },
+              ]}
+              unit="users"
+            />
+          </ChartCard>
         </div>
 
         <div className="foundations__toolbar">

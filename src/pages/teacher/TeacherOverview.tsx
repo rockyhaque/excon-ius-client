@@ -4,6 +4,9 @@ import { useGetLeaveHistoryQuery } from "@/redux/features/leaves/leaves.api";
 import { useTeacherProfile, useSkipTeacherApi } from "@/hooks/useTeacherProfile";
 import { TeacherProfileCard } from "@/components/teacher/TeacherProfileCard";
 import { TeacherOverviewStats } from "@/components/teacher/TeacherOverviewStats";
+import { TeacherDutyCharts } from "@/components/teacher/TeacherDutyCharts";
+import { TeacherLeaveStats } from "@/components/teacher/TeacherLeaveStats";
+import { TeacherRulesCard } from "@/components/teacher/TeacherRulesCard";
 import { TeacherExamsSnippet } from "@/components/teacher/TeacherExamsSnippet";
 import type { PublishedAllocationRow } from "@/types/teacher";
 import type { TeacherLeaveRow } from "@/types/teacher";
@@ -51,7 +54,13 @@ export function TeacherOverview() {
         isLoading={isLoading || isLoadingAllocations || isLoadingLeaves}
       />
 
+      <TeacherDutyCharts myDuties={myDuties} />
+
+      <TeacherLeaveStats leaves={leaves} />
+
       <TeacherProfileCard profile={profile} isLoading={isLoading} />
+
+      <TeacherRulesCard />
 
       <TeacherExamsSnippet />
     </div>

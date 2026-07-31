@@ -1,7 +1,10 @@
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "react-toastify";
+import "@/styles/overview.css";
 import { Modal } from "@/components/ui/Modal";
 import { IconEdit, IconTrash } from "@/components/ui/Icons";
+import { AreaChart, ChartCard, DonutChart, HBarList, VIZ } from "@/components/overview/charts";
+import { bucketByDate, countBy, isUpcoming } from "@/utils/stats";
 import { getErrorMessage } from "@/utils/getErrorMessage";
 import {
   useCreateExamMutation,
@@ -22,13 +25,37 @@ import { mapBatches, mapCourses, mapDepartments, mapSections } from "@/component
 type Option = { id: string; label: string };
 
 export function ExamsPanel() {
-  const { data: rowsRaw = [], isLoading, error } = useGetExamsQuery();
-  const rows = mapExams(rowsRaw);
+  const { data: rowsRaw = [], isLoading, error } = useGetExamsQuery({ limit: 100 });
+  const rows = useMemo(() => mapExams(rowsRaw), [rowsRaw]);
 
-  const { data: depsRaw = [] } = useGetDepartmentsQuery();
-  const { data: batchesRaw = [] } = useGetBatchesQuery();
-  const { data: sectionsRaw = [] } = useGetSectionsQuery();
-  const { data: coursesRaw = [] } = useGetCoursesQuery();
+  // ── Stats & chart data ────────────────────────────────────────
+  const statusCounts = useMemo(() => {
+    const c = { SCHEDULED: 0, RESCHEDULED: 0, PENDING: 0, CANCELLED: 0 } as Record<string, number>;
+    rows.forEach((e) => {
+      const st = (e.status || "").toUpperCase();
+      if (st in c) c[st]++;
+    });
+    return c;
+  }, [rows]);
+
+  const upcomingCount = useMemo(() => rows.filter((e) => isUpcoming(e.exam_date)).length, [rows]);
+  const deptsCovered = useMemo(() => new Set(rows.map((e) => e.dept).filter(Boolean)).size, [rows]);
+  const scheduleDensity = useMemo(() => bucketByDate(rows, (e) => e.exam_date, 20), [rows]);
+  const examsByDept = useMemo(() => countBy(rows, (e) => e.dept, 8), [rows]);
+  const statusSlices = useMemo(
+    () => [
+      { label: "Scheduled", value: statusCounts.SCHEDULED, color: VIZ.blue },
+      { label: "Rescheduled", value: statusCounts.RESCHEDULED, color: VIZ.warning },
+      { label: "Pending", value: statusCounts.PENDING, color: VIZ.neutral },
+      { label: "Cancelled", value: statusCounts.CANCELLED, color: VIZ.critical },
+    ],
+    [statusCounts],
+  );
+
+  const { data: depsRaw = [] } = useGetDepartmentsQuery({ limit: 100 });
+  const { data: batchesRaw = [] } = useGetBatchesQuery({ limit: 100 });
+  const { data: sectionsRaw = [] } = useGetSectionsQuery({ limit: 100 });
+  const { data: coursesRaw = [] } = useGetCoursesQuery({ limit: 100 });
 
   const deps = useMemo(() => mapDepartments(depsRaw), [depsRaw]);
   const batches = useMemo(() => mapBatches(batchesRaw), [batchesRaw]);
@@ -189,6 +216,41 @@ export function ExamsPanel() {
       {isLoading ? <p className="foundations__muted">Loading…</p> : null}
       {error ? <p className="foundations__error">Could not load exams.</p> : null}
 
+      {rows.length > 0 ? (
+        <>
+          <div className="ov-kpis" style={{ marginBottom: 16 }}>
+            <div className="ov-kpi">
+              <div className="ov-kpi__label">Total exams</div>
+              <div className="ov-kpi__value">{rows.length.toLocaleString()}</div>
+            </div>
+            <div className="ov-kpi">
+              <div className="ov-kpi__label">Upcoming</div>
+              <div className="ov-kpi__value">{upcomingCount.toLocaleString()}</div>
+            </div>
+            <div className="ov-kpi">
+              <div className="ov-kpi__label">Cancelled</div>
+              <div className="ov-kpi__value">{statusCounts.CANCELLED.toLocaleString()}</div>
+            </div>
+            <div className="ov-kpi">
+              <div className="ov-kpi__label">Departments covered</div>
+              <div className="ov-kpi__value">{deptsCovered.toLocaleString()}</div>
+            </div>
+          </div>
+
+          <div className="ov-grid" style={{ marginBottom: 20 }}>
+            <ChartCard title="Schedule density" subtitle="Exams scheduled per date" wide>
+              <AreaChart data={scheduleDensity} />
+            </ChartCard>
+            <ChartCard title="Exam status" subtitle="Lifecycle of the current exams">
+              <DonutChart centerLabel="exams" data={statusSlices} />
+            </ChartCard>
+            <ChartCard title="Exams per department" subtitle="Where the exam load sits">
+              <HBarList data={examsByDept} unit="exams" />
+            </ChartCard>
+          </div>
+        </>
+      ) : null}
+
       <div className="foundations__table-wrap">
         <table className="foundations__table">
           <thead>
@@ -199,13 +261,15 @@ export function ExamsPanel() {
               <th>Dept</th>
               <th>Batch</th>
               <th>Section</th>
+              <th style={{ width: 120 }}>Status</th>
+              <th style={{ width: 90 }}>Students</th>
               <th style={{ width: 160 }}>Actions</th>
             </tr>
           </thead>
           <tbody>
             {rows.length === 0 ? (
               <tr>
-                <td colSpan={7} className="foundations__empty">
+                <td colSpan={9} className="foundations__empty">
                   No exams yet.
                 </td>
               </tr>
@@ -225,6 +289,12 @@ export function ExamsPanel() {
                   <td>{e.dept || "—"}</td>
                   <td>{e.batch || "—"}</td>
                   <td>{e.section || "—"}</td>
+                  <td>
+                    <span className={`foundations__badge ${e.status.toUpperCase() === "CANCELLED" ? "foundations__badge--danger" : ""}`}>
+                      {e.status || "—"}
+                    </span>
+                  </td>
+                  <td>{e.expected_students == null ? "—" : e.expected_students}</td>
                   <td>
                     <div className="foundations__actions">
                       <button type="button" className="foundations__icon-btn" onClick={() => openEdit(e)} aria-label="Edit">

@@ -59,7 +59,8 @@ export function DonutChart({ data, centerLabel }: { data: Slice[]; centerLabel?:
           if (d.value <= 0) return null;
           const sweep = (d.value / total) * 360;
           const start = angle + gap / 2;
-          const end = angle + sweep - gap / 2;
+          // Cap a lone full-circle slice below 360° so its arc endpoints differ and it renders as a ring.
+          const end = angle + Math.min(sweep, 359.9) - gap / 2;
           angle += sweep;
           return (
             <path key={d.label} d={arc(cx, cy, rO, rI, start, Math.max(start, end))} fill={d.color}>
@@ -85,15 +86,15 @@ export function DonutChart({ data, centerLabel }: { data: Slice[]; centerLabel?:
 
 /* ── Horizontal bars (magnitude) ──────────────────────────────────────── */
 
-type Bar = { label: string; value: number; color?: string; sub?: string };
+type Bar = { label: string; value: number; color?: string; sub?: string; id?: string };
 
 export function HBarList({ data, color = VIZ.blue, unit }: { data: Bar[]; color?: string; unit?: string }) {
   if (data.length === 0) return <EmptyState label="No data yet." />;
   const max = Math.max(1, ...data.map((d) => d.value));
   return (
     <div className="ov-bars">
-      {data.map((d) => (
-        <div className="ov-bars__row" key={d.label} title={`${d.label}: ${d.value}${unit ? " " + unit : ""}`}>
+      {data.map((d, i) => (
+        <div className="ov-bars__row" key={d.id ?? `${d.label}-${i}`} title={`${d.label}: ${d.value}${unit ? " " + unit : ""}`}>
           <div className="ov-bars__label">
             {d.label}
             {d.sub ? <span className="ov-bars__sub"> {d.sub}</span> : null}

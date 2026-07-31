@@ -55,6 +55,9 @@ export function mapExams(rows: unknown): Exam[] {
     exam_date: safeStr((e as any).exam_date),
     start_time: safeStr((e as any).start_time),
     end_time: safeStr((e as any).end_time),
+    status: safeStr((e as any).status),
+    expected_students: (e as any).expected_students == null ? null : asNum((e as any).expected_students),
+    semester_name: safeStr((e as any).semester_name),
   }));
 }
 

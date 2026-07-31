@@ -1,8 +1,11 @@
 import { useMemo, useState } from "react";
 import { toast } from "react-toastify";
+import "@/styles/overview.css";
 import { Modal } from "@/components/ui/Modal";
 import { IconEdit } from "@/components/ui/Icons";
 import { getErrorMessage } from "@/utils/getErrorMessage";
+import { ChartCard, DonutChart, HBarList, VIZ } from "@/components/overview/charts";
+import { countBy } from "@/utils/stats";
 import {
   useEditAllocationMutation,
   useGetAiAllocationQuery,
@@ -14,7 +17,9 @@ import {
   useTriggerAiAllocationMutation,
 } from "@/redux/features/allocations/allocations.api";
 import { useGetRoomsQuery } from "@/redux/features/exam-room/examRoom.api";
-import { mapAllocations, type AllocationRow } from "@/components/allocations/allocations.types";
+import { mapAllocations, mapWorkload, type AllocationRow } from "@/components/allocations/allocations.types";
+
+type AiSummary = { total_assigned: number; skipped_no_room: number; skipped_no_teacher: number };
 
 type Tab = "draft" | "published";
 type RoomOption = { id: string; name: string; capacity: number | null; is_defect: boolean };
@@ -28,6 +33,26 @@ function fmtTime(v: string): string {
 function toCount(v: unknown): number {
   const n = Number(v);
   return Number.isFinite(n) ? n : 0;
+}
+
+function SummaryPill({ color, label, value }: { color: string; label: string; value: number }) {
+  return (
+    <span
+      style={{
+        display: "inline-flex",
+        alignItems: "center",
+        gap: 6,
+        padding: "3px 10px",
+        borderRadius: 999,
+        fontSize: 13,
+        fontWeight: 600,
+        color: "#fff",
+        background: color,
+      }}
+    >
+      {value} <span style={{ fontWeight: 400, opacity: 0.92 }}>{label}</span>
+    </span>
+  );
 }
 
 function AllocationTable({
@@ -135,7 +160,7 @@ export function AllocationsPanel() {
   const draftQuery = useGetAiAllocationQuery(undefined, { skip: tab !== "draft" });
   const publishedQuery = useGetPublishedAllocationsQuery(undefined, { skip: tab !== "published" });
   const { data: reports } = useGetAllocationReportsQuery();
-  const { data: roomsRaw = [] } = useGetRoomsQuery();
+  const { data: roomsRaw = [] } = useGetRoomsQuery({ limit: 100 });
 
   const draftRows = useMemo(() => mapAllocations(draftQuery.data), [draftQuery.data]);
   const publishedRows = useMemo(() => mapAllocations(publishedQuery.data), [publishedQuery.data]);
@@ -154,6 +179,54 @@ export function AllocationsPanel() {
   }, [roomsRaw]);
 
   const stats = reports?.stats as Record<string, unknown> | undefined;
+
+  // Rows for whichever tab is active — drives the tab-scoped KPIs and "duties per room".
+  const activeRows = tab === "draft" ? draftRows : publishedRows;
+
+  // ── Derived stats for the charts ──────────────────────────────────
+  // Coverage is measured in EXAMS (distinct exam ids), not duty-rows — a single exam can have both a
+  // published and a fresh draft allocation row, so raw published_count+draft_count can exceed total_exams.
+  const totalExams = toCount(stats?.total_exams);
+  const publishedExams = toCount(stats?.published_exams);
+  const allocatedExams = toCount(stats?.allocated_exams);
+  const draftOnlyExams = Math.max(0, allocatedExams - publishedExams);
+  const unassigned = Math.max(0, totalExams - allocatedExams);
+
+  const teachersUtilized = useMemo(
+    () => new Set(activeRows.map((r) => r.teacher_id).filter(Boolean)).size,
+    [activeRows],
+  );
+  const overCapacityRooms = useMemo(
+    () =>
+      new Set(
+        activeRows
+          .filter((r) => r.room_capacity != null && r.expected_students != null && r.expected_students > r.room_capacity)
+          .map((r) => r.room_id),
+      ).size,
+    [activeRows],
+  );
+
+  const workloadBars = useMemo(() => {
+    return mapWorkload(reports?.workload)
+      .filter((w) => w.name)
+      .slice()
+      .sort((a, b) => b.current_allocations - a.current_allocations)
+      .slice(0, 12)
+      .map((w) => {
+        const cur = w.current_allocations;
+        const lim = w.limit_value;
+        const color =
+          lim > 0 && cur >= lim ? VIZ.critical : lim > 0 && cur >= 0.8 * lim ? VIZ.warning : VIZ.blue;
+        return { id: w.id, label: w.name, value: cur, sub: `/ ${lim}`, color };
+      });
+  }, [reports]);
+
+  const dutiesPerRoom = useMemo(
+    () => countBy(activeRows, (r) => r.room_name, 12),
+    [activeRows],
+  );
+
+  const [aiSummary, setAiSummary] = useState<AiSummary | null>(null);
 
   const [triggerAi, { isLoading: generating }] = useTriggerAiAllocationMutation();
   const [publish, { isLoading: publishing }] = usePublishAllocationMutation();
@@ -220,9 +293,16 @@ export function AllocationsPanel() {
       };
       const s = res.summary;
       if (s) {
-        const skipped = toCount(s.skipped_no_room) + toCount(s.skipped_no_teacher);
-        toast.success(`Draft routine generated — ${toCount(s.total_assigned)} assigned, ${skipped} skipped.`);
+        const summary: AiSummary = {
+          total_assigned: toCount(s.total_assigned),
+          skipped_no_room: toCount(s.skipped_no_room),
+          skipped_no_teacher: toCount(s.skipped_no_teacher),
+        };
+        setAiSummary(summary);
+        const skipped = summary.skipped_no_room + summary.skipped_no_teacher;
+        toast.success(`Draft routine generated — ${summary.total_assigned} assigned, ${skipped} skipped.`);
       } else {
+        setAiSummary(null);
         toast.success(res.message ?? "Draft routine generated.");
       }
       setTab("draft");
@@ -295,6 +375,59 @@ export function AllocationsPanel() {
             <div className="foundations__stat-label">Total teachers</div>
             <div className="foundations__stat-value">{toCount(stats?.total_teachers)}</div>
           </div>
+          <div className="foundations__stat">
+            <div className="foundations__stat-label">Teachers utilized ({tab})</div>
+            <div className="foundations__stat-value">{teachersUtilized}</div>
+          </div>
+          <div className="foundations__stat">
+            <div className="foundations__stat-label">Over-capacity rooms ({tab})</div>
+            <div className="foundations__stat-value" style={{ color: overCapacityRooms > 0 ? VIZ.critical : undefined }}>
+              {overCapacityRooms}
+            </div>
+          </div>
+        </div>
+
+        {aiSummary ? (
+          <div
+            role="status"
+            style={{
+              display: "flex",
+              flexWrap: "wrap",
+              gap: 8,
+              alignItems: "center",
+              margin: "0 0 16px",
+              padding: "10px 12px",
+              borderRadius: 8,
+              border: `1px solid ${VIZ.grid}`,
+              background: "#f8fafc",
+            }}
+          >
+            <strong style={{ marginRight: 4 }}>Last generation:</strong>
+            <SummaryPill color={VIZ.good} label="assigned" value={aiSummary.total_assigned} />
+            <SummaryPill color={VIZ.warning} label="skipped — no room" value={aiSummary.skipped_no_room} />
+            <SummaryPill color={VIZ.critical} label="skipped — no teacher" value={aiSummary.skipped_no_teacher} />
+          </div>
+        ) : null}
+
+        <div className="ov-grid" style={{ marginBottom: 16 }}>
+          <ChartCard title="Duty coverage" subtitle="Exams by allocation state">
+            <DonutChart
+              centerLabel="exams"
+              data={[
+                { label: "Published", value: publishedExams, color: VIZ.good },
+                { label: "Draft only", value: draftOnlyExams, color: VIZ.warning },
+                { label: "Unassigned", value: unassigned, color: VIZ.neutral },
+              ]}
+            />
+          </ChartCard>
+
+          <ChartCard title="Invigilation workload" subtitle="Duties assigned per teacher (vs limit)">
+            <HBarList data={workloadBars} unit="duties" />
+          </ChartCard>
+
+          <ChartCard title={`Duties per room (${tab})`} subtitle="Where the current routine sits">
+            <HBarList data={dutiesPerRoom} unit="duties" color={VIZ.orange} />
+          </ChartCard>
         </div>
 
         <div className="foundations__toolbar">

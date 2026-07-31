@@ -25,6 +25,33 @@ export type AllocationRow = {
   teacher_email: string | null;
 };
 
+/**
+ * Row shape from GET /allocations/reports → workload[]. One entry per teacher
+ * with their configured duty limit and current assignment count.
+ */
+export type WorkloadRow = {
+  id: string;
+  name: string;
+  employee_id: string | null;
+  limit_value: number;
+  current_allocations: number;
+};
+
+export function mapWorkload(rows: unknown): WorkloadRow[] {
+  return toRowArray(rows).map((w) => ({
+    id: asId(w.id),
+    name: str(w.name),
+    employee_id: w.employee_id == null ? null : str(w.employee_id),
+    limit_value: num(w.limit_value),
+    current_allocations: num(w.current_allocations),
+  }));
+}
+
+function num(v: unknown): number {
+  const n = Number(v);
+  return Number.isFinite(n) ? n : 0;
+}
+
 function asId(v: unknown): string {
   if (v == null) return "";
   return String(v);

@@ -1,6 +1,22 @@
 import { baseApi } from "@/redux/baseApi";
 import type { UserRecord } from "@/types/users";
 
+/** Teacher workload row from GET /users/workload (bare array). */
+export type WorkloadRow = {
+  id: string;
+  name: string | null;
+  employee_id: string | null;
+  limit_value: number | null;
+  current_allocations: number | string;
+};
+
+/** /users/all and /users/teachers are paginated → { data, pagination }; unwrap to the array. */
+function normalizeUserList(res: unknown): UserRecord[] {
+  if (Array.isArray(res)) return res as UserRecord[];
+  const data = (res as { data?: unknown })?.data;
+  return Array.isArray(data) ? (data as UserRecord[]) : [];
+}
+
 export const usersApi = baseApi.injectEndpoints({
   endpoints: (builder) => ({
     getAllUsers: builder.query<
@@ -16,14 +32,17 @@ export const usersApi = baseApi.injectEndpoints({
         }>
     >({
       query: (params) => ({ url: "/users/all", method: "GET", params: params ?? undefined }),
+      transformResponse: normalizeUserList,
       providesTags: ["USERS"],
     }),
-    getTeachers: builder.query<UserRecord[], void>({
-      query: () => ({ url: "/users/teachers", method: "GET" }),
+    getTeachers: builder.query<UserRecord[], void | Record<string, unknown>>({
+      query: (params) => ({ url: "/users/teachers", method: "GET", params: params ?? undefined }),
+      transformResponse: normalizeUserList,
       providesTags: ["USERS"],
     }),
-    getWorkload: builder.query<unknown, void>({
+    getWorkload: builder.query<WorkloadRow[], void>({
       query: () => ({ url: "/users/workload", method: "GET" }),
+      transformResponse: (res: unknown) => (Array.isArray(res) ? (res as WorkloadRow[]) : ((res as { data?: WorkloadRow[] })?.data ?? [])),
       providesTags: ["USERS"],
     }),
     createAdmin: builder.mutation<UserRecord, { name: string; email: string; password: string }>({

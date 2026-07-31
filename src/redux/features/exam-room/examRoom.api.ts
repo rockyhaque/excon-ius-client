@@ -5,9 +5,16 @@ export type RoomEntity = Record<string, unknown> & { id?: number | string };
 
 export const examRoomApi = baseApi.injectEndpoints({
   endpoints: (builder) => ({
-    getExams: builder.query<ExamEntity[], void>({
-      query: () => ({ url: "/exam-room/exams", method: "GET" }),
+    getExams: builder.query<ExamEntity[], void | Record<string, unknown>>({
+      query: (params) => ({ url: "/exam-room/exams", method: "GET", params: params ?? undefined }),
       providesTags: ["EXAMS"],
+    }),
+    generateExamRoutine: builder.mutation<
+      { message: string; summary: Record<string, unknown> },
+      { semester_id: string; start_date: string; end_date: string; start_time: string; end_time: string; skip_weekends?: boolean; replace?: boolean }
+    >({
+      query: (data) => ({ url: "/exam-room/exams/generate-routine", method: "POST", data }),
+      invalidatesTags: ["EXAMS"],
     }),
     getExamById: builder.query<ExamEntity, string | number>({
       query: (id) => ({ url: `/exam-room/exams/${id}`, method: "GET" }),
@@ -32,8 +39,8 @@ export const examRoomApi = baseApi.injectEndpoints({
       query: (id) => ({ url: `/exam-room/exams/${id}`, method: "DELETE" }),
       invalidatesTags: ["EXAMS"],
     }),
-    getRooms: builder.query<RoomEntity[], void>({
-      query: () => ({ url: "/exam-room/rooms", method: "GET" }),
+    getRooms: builder.query<RoomEntity[], void | Record<string, unknown>>({
+      query: (params) => ({ url: "/exam-room/rooms", method: "GET", params: params ?? undefined }),
       providesTags: ["ROOMS"],
     }),
     getRoomCapacity: builder.query<RoomEntity, string | number>({
@@ -78,6 +85,7 @@ export const examRoomApi = baseApi.injectEndpoints({
 
 export const {
   useGetExamsQuery,
+  useGenerateExamRoutineMutation,
   useGetExamByIdQuery,
   useCreateExamMutation,
   useUpdateExamMutation,

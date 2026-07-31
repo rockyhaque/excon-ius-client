@@ -143,9 +143,9 @@ export function LogsPanel() {
   const admin = useGetAdminActionLogsQuery(undefined, { skip: tab !== "admin" });
 
   // Lookup data so UUIDs in `details` can be shown as real names.
-  const { data: teachersRaw } = useGetTeachersQuery();
-  const { data: examsRaw } = useGetExamsQuery();
-  const { data: roomsRaw } = useGetRoomsQuery();
+  const { data: teachersRaw } = useGetTeachersQuery({ limit: 100 });
+  const { data: examsRaw } = useGetExamsQuery({ limit: 100 });
+  const { data: roomsRaw } = useGetRoomsQuery({ limit: 100 });
 
   const maps = useMemo<NameMaps>(() => {
     const teacher = new Map<string, string>();

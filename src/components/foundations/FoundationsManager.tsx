@@ -1,21 +1,53 @@
 import { useState } from "react";
 import "@/styles/foundations.css";
+import "@/styles/overview.css";
 import { DepartmentsPanel } from "@/components/foundations/DepartmentsPanel";
 import { BatchesPanel } from "@/components/foundations/BatchesPanel";
 import { SectionsPanel } from "@/components/foundations/SectionsPanel";
 import { CoursesPanel } from "@/components/foundations/CoursesPanel";
+import { CurriculumPanel } from "@/components/foundations/CurriculumPanel";
+import {
+  useGetBatchesQuery,
+  useGetCoursesQuery,
+  useGetDepartmentsQuery,
+  useGetSectionsQuery,
+} from "@/redux/features/foundations/foundations.api";
+import { mapBatches, mapCourses, mapDepartments, mapSections } from "@/components/foundations/foundations.types";
+import { ChartCard, HBarList, VIZ } from "@/components/overview/charts";
+import { countBy } from "@/utils/stats";
 
-type FoundationsTab = "departments" | "batches" | "sections" | "courses";
+type FoundationsTab = "departments" | "batches" | "sections" | "courses" | "curriculum";
 
 const TAB_LABEL: Record<FoundationsTab, string> = {
   departments: "Departments",
   batches: "Batches",
   sections: "Sections",
   courses: "Courses",
+  curriculum: "Curriculum",
 };
 
 export function FoundationsManager() {
   const [tab, setTab] = useState<FoundationsTab>("departments");
+
+  const { data: deptsRaw = [] } = useGetDepartmentsQuery({ limit: 100 });
+  const { data: batchesRaw = [] } = useGetBatchesQuery({ limit: 100 });
+  const { data: sectionsRaw = [] } = useGetSectionsQuery({ limit: 100 });
+  const { data: coursesRaw = [] } = useGetCoursesQuery({ limit: 100 });
+
+  const departments = mapDepartments(deptsRaw);
+  const batches = mapBatches(batchesRaw);
+  const sections = mapSections(sectionsRaw);
+  const courses = mapCourses(coursesRaw);
+
+  const kpis = [
+    { label: "Departments", value: departments.length },
+    { label: "Batches", value: batches.length },
+    { label: "Sections", value: sections.length },
+    { label: "Courses", value: courses.length },
+  ];
+
+  const coursesPerDept = countBy(courses, (c) => c.dept_name ?? "");
+  const batchesPerDept = countBy(batches, (b) => b.dept_name ?? "");
 
   return (
     <div className="foundations">
@@ -27,6 +59,24 @@ export function FoundationsManager() {
               Manage departments, batches, sections, and courses.
             </p>
           </div>
+        </div>
+
+        <div className="ov-kpis" style={{ marginBottom: 16 }}>
+          {kpis.map((k) => (
+            <div className="ov-kpi" key={k.label}>
+              <div className="ov-kpi__label">{k.label}</div>
+              <div className="ov-kpi__value">{k.value.toLocaleString()}</div>
+            </div>
+          ))}
+        </div>
+
+        <div className="ov-grid" style={{ marginBottom: 20 }}>
+          <ChartCard title="Courses per department" subtitle="How courses are distributed">
+            <HBarList data={coursesPerDept} unit="courses" />
+          </ChartCard>
+          <ChartCard title="Batches per department" subtitle="How batches are distributed">
+            <HBarList data={batchesPerDept} unit="batches" color={VIZ.orange} />
+          </ChartCard>
         </div>
 
         <div className="foundations__tabs" role="tablist" aria-label="Foundation entity">
@@ -50,8 +100,10 @@ export function FoundationsManager() {
           <BatchesPanel />
         ) : tab === "sections" ? (
           <SectionsPanel />
-        ) : (
+        ) : tab === "courses" ? (
           <CoursesPanel />
+        ) : (
+          <CurriculumPanel />
         )}
       </div>
     </div>

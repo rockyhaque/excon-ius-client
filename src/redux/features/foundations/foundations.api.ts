@@ -11,8 +11,8 @@ function normalizeListResponse(res: unknown): FoundationEntity[] {
 
 export const foundationsApi = baseApi.injectEndpoints({
   endpoints: (builder) => ({
-    getDepartments: builder.query<FoundationEntity[], void>({
-      query: () => ({ url: "/foundations/departments", method: "GET" }),
+    getDepartments: builder.query<FoundationEntity[], void | Record<string, unknown>>({
+      query: (params) => ({ url: "/foundations/departments", method: "GET", params: params ?? undefined }),
       transformResponse: normalizeListResponse,
       providesTags: ["FOUNDATIONS"],
     }),
@@ -28,8 +28,8 @@ export const foundationsApi = baseApi.injectEndpoints({
       query: (id) => ({ url: `/foundations/departments/${id}`, method: "DELETE" }),
       invalidatesTags: ["FOUNDATIONS"],
     }),
-    getBatches: builder.query<FoundationEntity[], void>({
-      query: () => ({ url: "/foundations/batches", method: "GET" }),
+    getBatches: builder.query<FoundationEntity[], void | Record<string, unknown>>({
+      query: (params) => ({ url: "/foundations/batches", method: "GET", params: params ?? undefined }),
       transformResponse: normalizeListResponse,
       providesTags: ["FOUNDATIONS"],
     }),
@@ -45,8 +45,8 @@ export const foundationsApi = baseApi.injectEndpoints({
       query: (id) => ({ url: `/foundations/batches/${id}`, method: "DELETE" }),
       invalidatesTags: ["FOUNDATIONS"],
     }),
-    getSections: builder.query<FoundationEntity[], void>({
-      query: () => ({ url: "/foundations/sections", method: "GET" }),
+    getSections: builder.query<FoundationEntity[], void | Record<string, unknown>>({
+      query: (params) => ({ url: "/foundations/sections", method: "GET", params: params ?? undefined }),
       transformResponse: normalizeListResponse,
       providesTags: ["FOUNDATIONS"],
     }),
@@ -62,8 +62,8 @@ export const foundationsApi = baseApi.injectEndpoints({
       query: (id) => ({ url: `/foundations/sections/${id}`, method: "DELETE" }),
       invalidatesTags: ["FOUNDATIONS"],
     }),
-    getCourses: builder.query<FoundationEntity[], void>({
-      query: () => ({ url: "/foundations/courses", method: "GET" }),
+    getCourses: builder.query<FoundationEntity[], void | Record<string, unknown>>({
+      query: (params) => ({ url: "/foundations/courses", method: "GET", params: params ?? undefined }),
       transformResponse: normalizeListResponse,
       providesTags: ["FOUNDATIONS"],
     }),
@@ -77,6 +77,24 @@ export const foundationsApi = baseApi.injectEndpoints({
     }),
     deleteCourse: builder.mutation<{ message: string }, number | string>({
       query: (id) => ({ url: `/foundations/courses/${id}`, method: "DELETE" }),
+      invalidatesTags: ["FOUNDATIONS"],
+    }),
+    getSemesters: builder.query<FoundationEntity[], void>({
+      query: () => ({ url: "/foundations/semesters", method: "GET" }),
+      transformResponse: normalizeListResponse,
+      providesTags: ["FOUNDATIONS"],
+    }),
+    createSemester: builder.mutation<FoundationEntity, { name: string; season: string; year: number; is_current?: boolean }>({
+      query: (data) => ({ url: "/foundations/semesters", method: "POST", data }),
+      invalidatesTags: ["FOUNDATIONS"],
+    }),
+    getBatchCourses: builder.query<FoundationEntity[], string>({
+      query: (batchId) => ({ url: `/foundations/batches/${batchId}/courses`, method: "GET" }),
+      transformResponse: normalizeListResponse,
+      providesTags: ["FOUNDATIONS"],
+    }),
+    setBatchCourses: builder.mutation<{ message: string; data: FoundationEntity[] }, { batchId: string; course_ids: string[] }>({
+      query: ({ batchId, course_ids }) => ({ url: `/foundations/batches/${batchId}/courses`, method: "PUT", data: { course_ids } }),
       invalidatesTags: ["FOUNDATIONS"],
     }),
   }),
@@ -99,4 +117,8 @@ export const {
   useCreateCourseMutation,
   useUpdateCourseMutation,
   useDeleteCourseMutation,
+  useGetSemestersQuery,
+  useCreateSemesterMutation,
+  useGetBatchCoursesQuery,
+  useSetBatchCoursesMutation,
 } = foundationsApi;

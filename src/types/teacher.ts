@@ -44,7 +44,42 @@ export type PublishedAllocationRow = {
   room_id: string;
   status: string;
   course_name: string;
+  course_code?: string | null;
+  dept?: string | null;
+  batch?: string | null;
+  section?: string | null;
   exam_date: string;
+  start_time?: string | null;
+  end_time?: string | null;
+  expected_students?: number | null;
   room_name: string;
+  room_capacity?: number | null;
   teacher_name: string;
+  employee_id?: string | null;
+  teacher_email?: string | null;
+  designation?: string | null;
+};
+
+/** GET /exam-room/exams row (paginated {data}). */
+export type TeacherExamRow = {
+  id: string;
+  course_name?: string | null;
+  course_code?: string | null;
+  dept?: string | null;
+  batch?: string | null;
+  section?: string | null;
+  exam_date?: string | null;
+  start_time?: string | null;
+  end_time?: string | null;
+  status?: string | null;
+  semester_name?: string | null;
+};
+
+/** GET /allocations/rules (bare array). */
+export type TeacherRuleRow = {
+  id: string;
+  title: string;
+  content: string;
+  category?: string | null;
+  created_at?: string | null;
 };

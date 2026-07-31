@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
 import { toast } from "react-toastify";
+import "@/styles/overview.css";
 import { getErrorMessage } from "@/utils/getErrorMessage";
 import {
   useApproveLeaveMutation,
@@ -7,6 +8,8 @@ import {
   useGetLeaveRequestsQuery,
   useRejectLeaveMutation,
 } from "@/redux/features/leaves/leaves.api";
+import { AreaChart, ChartCard, DonutChart, HBarList, VIZ } from "@/components/overview/charts";
+import { bucketByDate, leaveDays, sumBy } from "@/utils/stats";
 
 type LeaveRow = {
   id: number | string;
@@ -43,7 +46,8 @@ export function AdminLeaveRequestsPanel() {
   const [tab, setTab] = useState<"pending" | "all">("pending");
 
   const pendingQuery = useGetLeaveRequestsQuery(undefined, { skip: tab !== "pending" });
-  const allQuery = useGetLeaveHistoryQuery(undefined, { skip: tab !== "all" });
+  // History is fetched unconditionally so the stats + charts stay populated on both tabs.
+  const allQuery = useGetLeaveHistoryQuery();
 
   const dataRaw = tab === "pending" ? pendingQuery.data : allQuery.data;
   const isLoading = tab === "pending" ? pendingQuery.isLoading : allQuery.isLoading;
@@ -53,6 +57,32 @@ export function AdminLeaveRequestsPanel() {
     const list = (dataRaw ?? []) as unknown[];
     return (Array.isArray(list) ? list : []).map((r) => r as LeaveRow).slice().sort(byCreatedDesc);
   }, [dataRaw]);
+
+  // ── All-history rows drive the stat tiles and charts ──────────────
+  const allRows = useMemo(() => {
+    const list = (allQuery.data ?? []) as unknown[];
+    return (Array.isArray(list) ? list : []).map((r) => r as LeaveRow);
+  }, [allQuery.data]);
+
+  const counts = useMemo(() => {
+    const c = { PENDING: 0, APPROVED: 0, REJECTED: 0 };
+    allRows.forEach((r) => {
+      const s = String(r.status || "").toUpperCase();
+      if (s === "APPROVED") c.APPROVED++;
+      else if (s === "REJECTED") c.REJECTED++;
+      else if (s === "PENDING") c.PENDING++;
+    });
+    return c;
+  }, [allRows]);
+
+  const daysByTeacher = useMemo(
+    () => sumBy(allRows, (r) => String(r.teacher_name || ""), (r) => leaveDays(r.start_date, r.end_date), 12),
+    [allRows],
+  );
+  const requestsOverTime = useMemo(
+    () => bucketByDate(allRows, (r) => String(r.created_at || "")),
+    [allRows],
+  );
 
   const [approve, { isLoading: approving }] = useApproveLeaveMutation();
   const [reject, { isLoading: rejecting }] = useRejectLeaveMutation();
@@ -87,6 +117,48 @@ export function AdminLeaveRequestsPanel() {
           </div>
         </div>
 
+        <div className="foundations__stats">
+          <div className="foundations__stat">
+            <div className="foundations__stat-label">Pending</div>
+            <div className="foundations__stat-value" style={{ color: counts.PENDING > 0 ? VIZ.warning : undefined }}>
+              {counts.PENDING}
+            </div>
+          </div>
+          <div className="foundations__stat">
+            <div className="foundations__stat-label">Approved</div>
+            <div className="foundations__stat-value">{counts.APPROVED}</div>
+          </div>
+          <div className="foundations__stat">
+            <div className="foundations__stat-label">Rejected</div>
+            <div className="foundations__stat-value">{counts.REJECTED}</div>
+          </div>
+          <div className="foundations__stat">
+            <div className="foundations__stat-label">Total requests</div>
+            <div className="foundations__stat-value">{allRows.length}</div>
+          </div>
+        </div>
+
+        <div className="ov-grid" style={{ marginBottom: 16 }}>
+          <ChartCard title="Leave status" subtitle="All requests by outcome">
+            <DonutChart
+              centerLabel="requests"
+              data={[
+                { label: "Approved", value: counts.APPROVED, color: VIZ.good },
+                { label: "Pending", value: counts.PENDING, color: VIZ.warning },
+                { label: "Rejected", value: counts.REJECTED, color: VIZ.critical },
+              ]}
+            />
+          </ChartCard>
+
+          <ChartCard title="Leave days by teacher" subtitle="Total requested days (top 12)">
+            <HBarList data={daysByTeacher} unit="days" />
+          </ChartCard>
+
+          <ChartCard title="Requests over time" subtitle="Leave requests by submission date" wide>
+            <AreaChart data={requestsOverTime} color={VIZ.orange} />
+          </ChartCard>
+        </div>
+
         <div className="foundations__tabs">
           <button
             type="button"
@@ -94,6 +166,26 @@ export function AdminLeaveRequestsPanel() {
             onClick={() => setTab("pending")}
           >
             Pending
+            {counts.PENDING > 0 ? (
+              <span
+                style={{
+                  marginLeft: 8,
+                  display: "inline-flex",
+                  minWidth: 20,
+                  height: 20,
+                  padding: "0 6px",
+                  borderRadius: 999,
+                  alignItems: "center",
+                  justifyContent: "center",
+                  fontSize: 12,
+                  fontWeight: 700,
+                  color: "#fff",
+                  background: VIZ.warning,
+                }}
+              >
+                {counts.PENDING}
+              </span>
+            ) : null}
           </button>
           <button
             type="button"
@@ -135,6 +227,11 @@ export function AdminLeaveRequestsPanel() {
                       </td>
                       <td>
                         {fmtDate(r.start_date)} → {fmtDate(r.end_date)}
+                        {r.reason ? (
+                          <div className="foundations__muted" style={{ margin: 0 }}>
+                            {r.reason}
+                          </div>
+                        ) : null}
                       </td>
                       <td>{statusPill(r.status)}</td>
                       <td>

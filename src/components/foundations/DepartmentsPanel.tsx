@@ -80,6 +80,9 @@ export function DepartmentsPanel() {
           <span className="foundations__muted" style={{ margin: 0 }}>
             Create and maintain departments (name, code).
           </span>
+          <span className="foundations__muted" style={{ margin: 0, fontWeight: 600 }}>
+            {rows.length} {rows.length === 1 ? "department" : "departments"}
+          </span>
         </div>
         <div className="foundations__toolbar-right">
           <button className="foundations__btn" type="button" onClick={openCreate}>
