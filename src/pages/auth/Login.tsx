@@ -9,6 +9,13 @@ import "@/styles/auth.css";
 import { useForm } from "react-hook-form";
 import { toast } from "react-toastify";
 
+const DEMO_PASSWORD = "Excon@2026";
+const DEMO_ACCOUNTS: { label: string; email: string }[] = [
+  { label: "Super Admin", email: "superadmin@gmail.com" },
+  { label: "Admin", email: "admin@example.com" },
+  { label: "Teacher", email: "sarah.khan@ius.com" },
+];
+
 export function Login() {
   const navigate = useNavigate();
   const { login } = useAuth();
@@ -19,10 +26,17 @@ export function Login() {
     register,
     handleSubmit,
     setError,
+    setValue,
     formState: { errors, isSubmitting },
   } = useForm<{ email: string; password: string }>({
     defaultValues: { email: "", password: "" },
   });
+
+  const fillDemo = (email: string) => {
+    setValue("email", email, { shouldValidate: true, shouldDirty: true });
+    setValue("password", DEMO_PASSWORD, { shouldValidate: true, shouldDirty: true });
+    setShowPassword(true);
+  };
 
   const onSubmit = handleSubmit(async (values: { email: string; password: string }) => {
     try {
@@ -96,7 +110,22 @@ export function Login() {
           {isSubmitting ? "Signing in…" : "Sign in"}
         </button>
 
-      
+        <div className="auth__demo">
+          <span className="auth__demo-label">Demo accounts — auto-fill credentials</span>
+          <div className="auth__demo-row">
+            {DEMO_ACCOUNTS.map((a) => (
+              <button
+                key={a.email}
+                type="button"
+                className="auth__demo-btn"
+                onClick={() => fillDemo(a.email)}
+                title={`${a.email} · ${DEMO_PASSWORD}`}
+              >
+                {a.label}
+              </button>
+            ))}
+          </div>
+        </div>
 
         <div className="auth__footer">
           <span>Don&apos;t have an account?</span> <Link to="/register">Sign up</Link>
