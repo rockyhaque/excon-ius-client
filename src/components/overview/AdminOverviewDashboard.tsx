@@ -286,7 +286,7 @@ export function AdminOverviewDashboard() {
           />
         </ChartCard>
 
-        <ChartCard title="Published duties over time" subtitle="Assigned invigilation duties by exam date" wide>
+        <ChartCard title="Published duties over time" subtitle="Assigned invigilation duties by exam date">
           <AreaChart data={dutiesOverDates} color={VIZ.blue} />
         </ChartCard>
 
@@ -306,17 +306,17 @@ export function AdminOverviewDashboard() {
               />
             </ChartCard>
 
-            <ChartCard title="New users over time" subtitle="Account sign-ups by month" wide>
+            <ChartCard title="New users over time" subtitle="Account sign-ups by month">
               <AreaChart data={newUsers} color={VIZ.orange} />
             </ChartCard>
           </>
         ) : null}
 
-        <ChartCard title="Exam schedule" subtitle="Exams by date (upcoming first)" wide>
+        <ChartCard title="Exam schedule" subtitle="Exams by date (upcoming first)">
           <AreaChart data={upcoming} />
         </ChartCard>
 
-        <ChartCard title="Recent activity" subtitle="Latest system events" wide>
+        <ChartCard title="Recent activity" subtitle="Latest system events">
           {activity.length === 0 ? (
             <div className="ov-chart__empty">No recent activity.</div>
           ) : (

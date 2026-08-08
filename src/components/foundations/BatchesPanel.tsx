@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { Modal } from "@/components/ui/Modal";
+import { ConfirmModal } from "@/components/ui/ConfirmModal";
 import { getErrorMessage } from "@/utils/getErrorMessage";
 import {
   useCreateBatchMutation,
@@ -30,6 +31,7 @@ export function BatchesPanel() {
 
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<Batch | null>(null);
+  const [pendingDelete, setPendingDelete] = useState<Batch | null>(null);
   const [deptId, setDeptId] = useState<string>("");
   const [batchNumber, setBatchNumber] = useState("");
   const [formError, setFormError] = useState<string | null>(null);
@@ -74,11 +76,12 @@ export function BatchesPanel() {
     }
   };
 
-  const onDelete = async (b: Batch) => {
-    if (!window.confirm(`Delete batch "${b.name}"? This may affect sections.`)) return;
+  const confirmDelete = async () => {
+    if (!pendingDelete) return;
     try {
-      await deleteBatch(b.id).unwrap();
+      await deleteBatch(pendingDelete.id).unwrap();
       toast.success("Batch deleted.");
+      setPendingDelete(null);
     } catch (e: unknown) {
       toast.error(getErrorMessage(e, "Could not delete batch."));
     }
@@ -91,13 +94,6 @@ export function BatchesPanel() {
           <h2 className="foundations__h2" style={{ margin: 0 }}>
             Batches
           </h2>
-          <span className="foundations__muted" style={{ margin: 0 }}>
-            Batches belong to a department.
-          </span>
-          <span className="foundations__muted" style={{ margin: 0, fontWeight: 600 }}>
-            {rows.length} {rows.length === 1 ? "batch" : "batches"} across{" "}
-            {new Set(rows.map((b) => b.dept_name).filter(Boolean)).size} departments
-          </span>
         </div>
         <div className="foundations__toolbar-right">
           {deptOptions.length === 0 ? <span className="foundations__muted">Create a department first.</span> : null}
@@ -142,7 +138,7 @@ export function BatchesPanel() {
                         type="button"
                         className="foundations__icon-btn foundations__icon-btn--danger"
                         disabled={deleting}
-                        onClick={() => void onDelete(b)}
+                        onClick={() => setPendingDelete(b)}
                         aria-label="Delete"
                       >
                         <IconTrash />
@@ -196,7 +192,15 @@ export function BatchesPanel() {
           {formError ? <div className="foundations__error">{formError}</div> : null}
         </div>
       </Modal>
+
+      <ConfirmModal
+        open={Boolean(pendingDelete)}
+        title="Delete batch"
+        message={`Delete batch "${pendingDelete?.name ?? ""}"? This may affect sections.`}
+        busy={deleting}
+        onClose={() => setPendingDelete(null)}
+        onConfirm={() => void confirmDelete()}
+      />
     </>
   );
 }
-

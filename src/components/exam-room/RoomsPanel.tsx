@@ -3,8 +3,8 @@ import { toast } from "react-toastify";
 import "@/styles/overview.css";
 import { Modal } from "@/components/ui/Modal";
 import { IconEdit, IconTrash } from "@/components/ui/Icons";
-import { ChartCard, DonutChart, HBarList, VIZ } from "@/components/overview/charts";
-import { num, sumBy } from "@/utils/stats";
+import { VIZ } from "@/components/overview/charts";
+import { num } from "@/utils/stats";
 import { getErrorMessage } from "@/utils/getErrorMessage";
 import {
   useCreateRoomMutation,
@@ -15,26 +15,15 @@ import {
 import { mapRooms } from "@/components/exam-room/examRoom.types";
 import type { Room } from "@/types/examRoom";
 
+const BUILDING_OPTIONS = ["Building A", "Building B"] as const;
+
 export function RoomsPanel() {
   const { data: rowsRaw = [], isLoading, error } = useGetRoomsQuery({ limit: 100 });
   const rows = useMemo(() => mapRooms(rowsRaw), [rowsRaw]);
 
-  // ── Stats & chart data ────────────────────────────────────────
   const usable = useMemo(() => rows.filter((r) => !r.is_defect), [rows]);
   const defectCount = rows.length - usable.length;
   const totalCapacity = useMemo(() => usable.reduce((s, r) => s + num(r.capacity), 0), [usable]);
-  const capacityByBuilding = useMemo(
-    () => sumBy(usable, (r) => r.building, (r) => num(r.capacity), 8),
-    [usable],
-  );
-  const largestRooms = useMemo(
-    () =>
-      [...rows]
-        .sort((a, b) => num(b.capacity) - num(a.capacity))
-        .slice(0, 8)
-        .map((r) => ({ label: r.name || "—", value: num(r.capacity) })),
-    [rows],
-  );
 
   const [createRoom, { isLoading: creating }] = useCreateRoomMutation();
   const [updateRoom, { isLoading: updating }] = useUpdateRoomMutation();
@@ -43,7 +32,7 @@ export function RoomsPanel() {
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<Room | null>(null);
   const [name, setName] = useState("");
-  const [building, setBuilding] = useState("");
+  const [building, setBuilding] = useState<string>(BUILDING_OPTIONS[0]);
   const [capacity, setCapacity] = useState<number>(20);
   const [isDefect, setIsDefect] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
@@ -51,7 +40,7 @@ export function RoomsPanel() {
   const openCreate = () => {
     setEditing(null);
     setName("");
-    setBuilding("");
+    setBuilding(BUILDING_OPTIONS[0]);
     setCapacity(20);
     setIsDefect(false);
     setFormError(null);
@@ -61,7 +50,7 @@ export function RoomsPanel() {
   const openEdit = (r: Room) => {
     setEditing(r);
     setName(r.name);
-    setBuilding(r.building);
+    setBuilding(BUILDING_OPTIONS.includes(r.building as (typeof BUILDING_OPTIONS)[number]) ? r.building : BUILDING_OPTIONS[0]);
     setCapacity(r.capacity || 20);
     setIsDefect(Boolean(r.is_defect));
     setFormError(null);
@@ -141,24 +130,6 @@ export function RoomsPanel() {
               <div className="ov-kpi__value">{totalCapacity.toLocaleString()}</div>
             </div>
           </div>
-
-          <div className="ov-grid" style={{ marginBottom: 20 }}>
-            <ChartCard title="Seating capacity by building" subtitle="Total usable seats per building">
-              <HBarList data={capacityByBuilding} unit="seats" color={VIZ.orange} />
-            </ChartCard>
-            <ChartCard title="Rooms by status" subtitle="Usable vs out-of-service rooms">
-              <DonutChart
-                centerLabel="rooms"
-                data={[
-                  { label: "Usable", value: usable.length, color: VIZ.good },
-                  { label: "Defect", value: defectCount, color: VIZ.critical },
-                ]}
-              />
-            </ChartCard>
-            <ChartCard title="Largest rooms" subtitle="Top rooms by seating capacity">
-              <HBarList data={largestRooms} unit="seats" />
-            </ChartCard>
-          </div>
         </>
       ) : null}
 
@@ -234,7 +205,13 @@ export function RoomsPanel() {
           </label>
           <label className="foundations__field">
             <span>Building</span>
-            <input value={building} onChange={(e) => setBuilding(e.target.value)} placeholder="e.g. Main Building" />
+            <select value={building} onChange={(e) => setBuilding(e.target.value)}>
+              {BUILDING_OPTIONS.map((b) => (
+                <option key={b} value={b}>
+                  {b}
+                </option>
+              ))}
+            </select>
           </label>
           <label className="foundations__field">
             <span>Capacity</span>

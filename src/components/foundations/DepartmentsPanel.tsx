@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Modal } from "@/components/ui/Modal";
+import { ConfirmModal } from "@/components/ui/ConfirmModal";
 import { getErrorMessage } from "@/utils/getErrorMessage";
 import {
   useCreateDepartmentMutation,
@@ -22,6 +23,7 @@ export function DepartmentsPanel() {
 
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<Department | null>(null);
+  const [pendingDelete, setPendingDelete] = useState<Department | null>(null);
   const [name, setName] = useState("");
   const [code, setCode] = useState("");
   const [formError, setFormError] = useState<string | null>(null);
@@ -60,11 +62,12 @@ export function DepartmentsPanel() {
     }
   };
 
-  const onDelete = async (d: Department) => {
-    if (!window.confirm(`Delete department "${d.name}"? This may affect batches/courses.`)) return;
+  const confirmDelete = async () => {
+    if (!pendingDelete) return;
     try {
-      await deleteDepartment(d.id).unwrap();
+      await deleteDepartment(pendingDelete.id).unwrap();
       toast.success("Department deleted.");
+      setPendingDelete(null);
     } catch (e: unknown) {
       toast.error(getErrorMessage(e, "Could not delete department."));
     }
@@ -77,12 +80,6 @@ export function DepartmentsPanel() {
           <h2 className="foundations__h2" style={{ margin: 0 }}>
             Departments
           </h2>
-          <span className="foundations__muted" style={{ margin: 0 }}>
-            Create and maintain departments (name, code).
-          </span>
-          <span className="foundations__muted" style={{ margin: 0, fontWeight: 600 }}>
-            {rows.length} {rows.length === 1 ? "department" : "departments"}
-          </span>
         </div>
         <div className="foundations__toolbar-right">
           <button className="foundations__btn" type="button" onClick={openCreate}>
@@ -126,7 +123,7 @@ export function DepartmentsPanel() {
                         type="button"
                         className="foundations__icon-btn foundations__icon-btn--danger"
                         disabled={deleting}
-                        onClick={() => void onDelete(d)}
+                        onClick={() => setPendingDelete(d)}
                         aria-label="Delete"
                       >
                         <IconTrash />
@@ -167,7 +164,15 @@ export function DepartmentsPanel() {
           {formError ? <div className="foundations__error">{formError}</div> : null}
         </div>
       </Modal>
+
+      <ConfirmModal
+        open={Boolean(pendingDelete)}
+        title="Delete department"
+        message={`Delete department "${pendingDelete?.name ?? ""}"? This may affect batches/courses.`}
+        busy={deleting}
+        onClose={() => setPendingDelete(null)}
+        onConfirm={() => void confirmDelete()}
+      />
     </>
   );
 }
-

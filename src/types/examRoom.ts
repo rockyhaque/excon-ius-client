@@ -23,7 +23,12 @@ export type Exam = {
   start_time: string;
   end_time: string;
   status: string;
+  exam_type: string;
   expected_students: number | null;
   semester_name: string;
+  room_id: string;
+  room_name: string;
+  room_building: string;
+  room_capacity: number | null;
 };
 

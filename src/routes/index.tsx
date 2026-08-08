@@ -14,7 +14,6 @@ import { ExamsRooms } from "@/pages/admin/ExamsRooms";
 import { Allocations } from "@/pages/admin/Allocations";
 import { LeaveRequests } from "@/pages/admin/LeaveRequests";
 import { Logs } from "@/pages/admin/Logs";
-import { Admins } from "@/pages/super-admin/Admins";
 import { Users } from "@/pages/super-admin/Users";
 import { SuperAdminLogs } from "@/pages/super-admin/Logs";
 import { TeacherOverview } from "@/pages/teacher/TeacherOverview";
@@ -51,8 +50,8 @@ export const router = createBrowserRouter([
     Component: withAuth(SuperAdminShell, role.superAdmin),
     children: [
       { index: true, Component: AdminOverview },
-      { path: "admins", Component: Admins },
       { path: "users", Component: Users },
+      { path: "admins", element: <Navigate to="/super-admin/users" replace /> },
       { path: "foundations", Component: Foundations },
       { path: "exams-rooms", Component: ExamsRooms },
       { path: "allocations", Component: Allocations },

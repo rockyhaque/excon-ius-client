@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { Modal } from "@/components/ui/Modal";
+import { ConfirmModal } from "@/components/ui/ConfirmModal";
 import { getErrorMessage } from "@/utils/getErrorMessage";
 import {
   useCreateSectionMutation,
@@ -11,9 +12,7 @@ import {
 import { mapBatches, mapSections } from "@/components/foundations/foundations.types";
 import type { Section } from "@/types/foundations";
 import { IconEdit, IconTrash } from "@/components/ui/Icons";
-import { ChartCard, HBarList } from "@/components/overview/charts";
 import { toast } from "react-toastify";
-import "@/styles/overview.css";
 
 export function SectionsPanel() {
   const { data: batchesRaw = [] } = useGetBatchesQuery();
@@ -26,24 +25,13 @@ export function SectionsPanel() {
 
   const rows = mapSections(rowsRaw);
 
-  // Sections per batch — seeded from ALL batches so batches with 0 sections stay visible.
-  const sectionsPerBatch = useMemo(() => {
-    const byBatch = new Map<string, number>();
-    for (const s of rows) byBatch.set(s.batch_id, (byBatch.get(s.batch_id) ?? 0) + 1);
-    return mapBatches(batchesRaw)
-      .map((b) => ({
-        label: `${b.dept_name || "—"} · ${b.name || b.number || "—"}`,
-        value: byBatch.get(b.id) ?? 0,
-      }))
-      .sort((a, b) => b.value - a.value);
-  }, [rows, batchesRaw]);
-
   const [createSection, { isLoading: creating }] = useCreateSectionMutation();
   const [updateSection, { isLoading: updating }] = useUpdateSectionMutation();
   const [deleteSection, { isLoading: deleting }] = useDeleteSectionMutation();
 
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<Section | null>(null);
+  const [pendingDelete, setPendingDelete] = useState<Section | null>(null);
   const [batchId, setBatchId] = useState<string>("");
   const [name, setName] = useState("");
   const [formError, setFormError] = useState<string | null>(null);
@@ -87,11 +75,12 @@ export function SectionsPanel() {
     }
   };
 
-  const onDelete = async (s: Section) => {
-    if (!window.confirm(`Delete section "${s.name}"?`)) return;
+  const confirmDelete = async () => {
+    if (!pendingDelete) return;
     try {
-      await deleteSection(s.id).unwrap();
+      await deleteSection(pendingDelete.id).unwrap();
       toast.success("Section deleted.");
+      setPendingDelete(null);
     } catch (e: unknown) {
       toast.error(getErrorMessage(e, "Could not delete section."));
     }
@@ -104,13 +93,6 @@ export function SectionsPanel() {
           <h2 className="foundations__h2" style={{ margin: 0 }}>
             Sections
           </h2>
-          <span className="foundations__muted" style={{ margin: 0 }}>
-            Sections belong to a batch.
-          </span>
-          <span className="foundations__muted" style={{ margin: 0, fontWeight: 600 }}>
-            {rows.length} {rows.length === 1 ? "section" : "sections"} across {batchOptions.length}{" "}
-            {batchOptions.length === 1 ? "batch" : "batches"}
-          </span>
         </div>
         <div className="foundations__toolbar-right">
           {batchOptions.length === 0 ? <span className="foundations__muted">Create a batch first.</span> : null}
@@ -122,12 +104,6 @@ export function SectionsPanel() {
 
       {isLoading ? <p className="foundations__muted">Loading…</p> : null}
       {error ? <p className="foundations__error">Could not load sections.</p> : null}
-
-      <div style={{ marginBottom: 16 }}>
-        <ChartCard title="Sections per batch" subtitle="Batches with no sections show as empty bars">
-          <HBarList data={sectionsPerBatch} unit="sections" />
-        </ChartCard>
-      </div>
 
       <div className="foundations__table-wrap">
         <table className="foundations__table">
@@ -163,7 +139,7 @@ export function SectionsPanel() {
                         type="button"
                         className="foundations__icon-btn foundations__icon-btn--danger"
                         disabled={deleting}
-                        onClick={() => void onDelete(s)}
+                        onClick={() => setPendingDelete(s)}
                         aria-label="Delete"
                       >
                         <IconTrash />
@@ -210,7 +186,15 @@ export function SectionsPanel() {
           {formError ? <div className="foundations__error">{formError}</div> : null}
         </div>
       </Modal>
+
+      <ConfirmModal
+        open={Boolean(pendingDelete)}
+        title="Delete section"
+        message={`Delete section "${pendingDelete?.name ?? ""}"?`}
+        busy={deleting}
+        onClose={() => setPendingDelete(null)}
+        onConfirm={() => void confirmDelete()}
+      />
     </>
   );
 }
-

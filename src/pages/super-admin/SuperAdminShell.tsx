@@ -2,7 +2,6 @@ import { DashboardLayout } from "@/layouts/DashboardLayout";
 
 const items = [
   { to: "/super-admin", label: "Overview" },
-  { to: "/super-admin/admins", label: "Admins" },
   { to: "/super-admin/users", label: "All Users" },
   { to: "/super-admin/foundations", label: "Foundations" },
   { to: "/super-admin/exams-rooms", label: "Exams & Rooms" },

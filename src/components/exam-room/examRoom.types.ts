@@ -57,7 +57,12 @@ export function mapExams(rows: unknown): Exam[] {
     end_time: safeStr((e as any).end_time),
     status: safeStr((e as any).status),
     expected_students: (e as any).expected_students == null ? null : asNum((e as any).expected_students),
+    exam_type: safeStr((e as any).exam_type),
     semester_name: safeStr((e as any).semester_name),
+    room_id: asId((e as any).room_id),
+    room_name: safeStr((e as any).room_name),
+    room_building: safeStr((e as any).room_building),
+    room_capacity: (e as any).room_capacity == null ? null : asNum((e as any).room_capacity),
   }));
 }
 

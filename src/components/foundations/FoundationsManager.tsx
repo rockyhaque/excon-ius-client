@@ -5,7 +5,6 @@ import { DepartmentsPanel } from "@/components/foundations/DepartmentsPanel";
 import { BatchesPanel } from "@/components/foundations/BatchesPanel";
 import { SectionsPanel } from "@/components/foundations/SectionsPanel";
 import { CoursesPanel } from "@/components/foundations/CoursesPanel";
-import { CurriculumPanel } from "@/components/foundations/CurriculumPanel";
 import {
   useGetBatchesQuery,
   useGetCoursesQuery,
@@ -13,17 +12,14 @@ import {
   useGetSectionsQuery,
 } from "@/redux/features/foundations/foundations.api";
 import { mapBatches, mapCourses, mapDepartments, mapSections } from "@/components/foundations/foundations.types";
-import { ChartCard, HBarList, VIZ } from "@/components/overview/charts";
-import { countBy } from "@/utils/stats";
 
-type FoundationsTab = "departments" | "batches" | "sections" | "courses" | "curriculum";
+type FoundationsTab = "departments" | "batches" | "sections" | "courses";
 
 const TAB_LABEL: Record<FoundationsTab, string> = {
   departments: "Departments",
   batches: "Batches",
   sections: "Sections",
   courses: "Courses",
-  curriculum: "Curriculum",
 };
 
 export function FoundationsManager() {
@@ -46,9 +42,6 @@ export function FoundationsManager() {
     { label: "Courses", value: courses.length },
   ];
 
-  const coursesPerDept = countBy(courses, (c) => c.dept_name ?? "");
-  const batchesPerDept = countBy(batches, (b) => b.dept_name ?? "");
-
   return (
     <div className="foundations">
       <div className="card foundations__card">
@@ -68,15 +61,6 @@ export function FoundationsManager() {
               <div className="ov-kpi__value">{k.value.toLocaleString()}</div>
             </div>
           ))}
-        </div>
-
-        <div className="ov-grid" style={{ marginBottom: 20 }}>
-          <ChartCard title="Courses per department" subtitle="How courses are distributed">
-            <HBarList data={coursesPerDept} unit="courses" />
-          </ChartCard>
-          <ChartCard title="Batches per department" subtitle="How batches are distributed">
-            <HBarList data={batchesPerDept} unit="batches" color={VIZ.orange} />
-          </ChartCard>
         </div>
 
         <div className="foundations__tabs" role="tablist" aria-label="Foundation entity">
@@ -100,10 +84,8 @@ export function FoundationsManager() {
           <BatchesPanel />
         ) : tab === "sections" ? (
           <SectionsPanel />
-        ) : tab === "courses" ? (
-          <CoursesPanel />
         ) : (
-          <CurriculumPanel />
+          <CoursesPanel />
         )}
       </div>
     </div>

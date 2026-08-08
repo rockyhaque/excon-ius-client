@@ -1,8 +1,23 @@
 import { useMemo, useState } from "react";
+import { toast } from "react-toastify";
 import "@/styles/overview.css";
-import { useGetAllUsersQuery } from "@/redux/features/users/users.api";
+import { Modal } from "@/components/ui/Modal";
+import { IconEdit, IconTrash } from "@/components/ui/Icons";
 import { DonutChart, HBarList, ChartCard, VIZ } from "@/components/overview/charts";
+import { ConfirmModal } from "@/components/ui/ConfirmModal";
+import { getErrorMessage } from "@/utils/getErrorMessage";
 import { countBy } from "@/utils/stats";
+import {
+  useCreateAdminMutation,
+  useDeleteAdminMutation,
+  useDeleteTeacherMutation,
+  useGetAllUsersQuery,
+  useUpdateAdminMutation,
+  useUpdateTeacherMutation,
+} from "@/redux/features/users/users.api";
+import type { UserRecord } from "@/types/users";
+
+type UserRow = UserRecord & { role?: string; is_active?: boolean; employee_id?: string };
 
 function safeStr(v: unknown) {
   if (v == null) return "";
@@ -16,13 +31,28 @@ function asBool(v: unknown) {
   return Boolean(v);
 }
 
+function roleOf(u: UserRow) {
+  return String(u.role ?? "").toUpperCase();
+}
+
+/** Super admin can manage admins and teachers — not other super admins. */
+function canManage(u: UserRow) {
+  const r = roleOf(u);
+  return r === "ADMIN" || r === "TEACHER";
+}
+
 export function Users() {
   const [search, setSearch] = useState("");
-  const [role, setRole] = useState<string>("");
-  const [active, setActive] = useState<string>("");
+  const [role, setRole] = useState("");
+  const [active, setActive] = useState("");
 
   const queryArgs = useMemo(() => {
-    const args: any = { limit: 200 };
+    const args: {
+      limit: number;
+      search?: string;
+      role?: string;
+      is_active?: boolean;
+    } = { limit: 200 };
     if (search.trim()) args.search = search.trim();
     if (role) args.role = role;
     if (active) args.is_active = active === "true";
@@ -30,26 +60,26 @@ export function Users() {
   }, [active, role, search]);
 
   const { data: users = [], isLoading, error } = useGetAllUsersQuery(queryArgs);
-
-  const rows = useMemo(() => (Array.isArray(users) ? users : []), [users]);
+  const rows = useMemo(() => (Array.isArray(users) ? (users as UserRow[]) : []), [users]);
 
   // Unfiltered snapshot so header stats stay stable regardless of table filters.
-  const { data: allUsers = [] } = useGetAllUsersQuery({ limit: 100 });
+  const { data: allUsers = [] } = useGetAllUsersQuery({ limit: 200 });
   const stats = useMemo(() => {
-    const list = Array.isArray(allUsers) ? allUsers : [];
+    const list = Array.isArray(allUsers) ? (allUsers as UserRow[]) : [];
     const byRole = { SUPER_ADMIN: 0, ADMIN: 0, TEACHER: 0 } as Record<string, number>;
-    let active = 0, available = 0;
+    let activeCount = 0;
+    let available = 0;
     for (const u of list) {
-      const r = String(u.role ?? "").toUpperCase();
+      const r = roleOf(u);
       if (r in byRole) byRole[r]++;
-      if ((u as any).is_active !== false) active++;
-      if (asBool((u as any).is_available)) available++;
+      if (asBool(u.is_active ?? true)) activeCount++;
+      if (asBool((u as { is_available?: unknown }).is_available)) available++;
     }
     return {
       total: list.length,
       byRole,
-      active,
-      inactive: list.length - active,
+      active: activeCount,
+      inactive: list.length - activeCount,
       available,
       onLeave: list.length - available,
     };
@@ -63,13 +93,130 @@ export function Users() {
     [allUsers],
   );
 
+  const [createAdmin, { isLoading: creating }] = useCreateAdminMutation();
+  const [updateAdmin, { isLoading: updatingAdmin }] = useUpdateAdminMutation();
+  const [updateTeacher, { isLoading: updatingTeacher }] = useUpdateTeacherMutation();
+  const [deleteAdmin, { isLoading: deletingAdmin }] = useDeleteAdminMutation();
+  const [deleteTeacher, { isLoading: deletingTeacher }] = useDeleteTeacherMutation();
+  const saving = creating || updatingAdmin || updatingTeacher;
+  const deleting = deletingAdmin || deletingTeacher;
+
+  const [open, setOpen] = useState(false);
+  const [mode, setMode] = useState<"create-admin" | "edit">("create-admin");
+  const [editing, setEditing] = useState<UserRow | null>(null);
+  const [pendingDelete, setPendingDelete] = useState<UserRow | null>(null);
+  const [name, setName] = useState("");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [isActive, setIsActive] = useState(true);
+  const [employeeId, setEmployeeId] = useState("");
+  const [formError, setFormError] = useState<string | null>(null);
+
+  const openCreateAdmin = () => {
+    setMode("create-admin");
+    setEditing(null);
+    setName("");
+    setEmail("");
+    setPassword("");
+    setIsActive(true);
+    setEmployeeId("");
+    setFormError(null);
+    setOpen(true);
+  };
+
+  const openEdit = (u: UserRow) => {
+    if (!canManage(u)) return;
+    setMode("edit");
+    setEditing(u);
+    setName(safeStr(u.name));
+    setEmail(safeStr(u.email));
+    setPassword("");
+    setIsActive(asBool(u.is_active ?? true));
+    setEmployeeId(safeStr(u.employee_id));
+    setFormError(null);
+    setOpen(true);
+  };
+
+  const submit = async () => {
+    setFormError(null);
+    if (!name.trim() || !email.trim()) {
+      setFormError("Name and email are required.");
+      return;
+    }
+
+    try {
+      if (mode === "create-admin") {
+        if (!password.trim()) {
+          setFormError("Password is required to create an admin.");
+          return;
+        }
+        await createAdmin({ name: name.trim(), email: email.trim(), password: password.trim() }).unwrap();
+        toast.success("Admin created.");
+      } else if (editing) {
+        const r = roleOf(editing);
+        if (r === "ADMIN") {
+          await updateAdmin({
+            id: editing.id,
+            body: { name: name.trim(), email: email.trim(), is_active: isActive },
+          }).unwrap();
+          toast.success("Admin updated.");
+        } else if (r === "TEACHER") {
+          await updateTeacher({
+            id: editing.id,
+            body: {
+              name: name.trim(),
+              email: email.trim(),
+              is_active: isActive,
+              ...(employeeId.trim() ? { employee_id: employeeId.trim() } : {}),
+            },
+          }).unwrap();
+          toast.success("Teacher updated.");
+        }
+      }
+      setOpen(false);
+    } catch (e: unknown) {
+      const msg = getErrorMessage(e, "Could not save user.");
+      setFormError(msg);
+      toast.error(msg);
+    }
+  };
+
+  const askDelete = (u: UserRow) => {
+    if (!canManage(u)) return;
+    setPendingDelete(u);
+  };
+
+  const confirmDelete = async () => {
+    const u = pendingDelete;
+    if (!u) return;
+    const r = roleOf(u);
+    if (r !== "ADMIN" && r !== "TEACHER") return;
+    const label = r === "ADMIN" ? "admin" : "teacher";
+    try {
+      if (r === "ADMIN") await deleteAdmin(u.id).unwrap();
+      else await deleteTeacher(u.id).unwrap();
+      toast.success(`${r === "ADMIN" ? "Admin" : "Teacher"} deleted.`);
+      setPendingDelete(null);
+    } catch (e: unknown) {
+      toast.error(getErrorMessage(e, `Could not delete ${label}.`));
+    }
+  };
+
+  const editingRole = editing ? roleOf(editing) : "";
+  const deleteRole = pendingDelete ? roleOf(pendingDelete) : "";
+  const deleteLabel = deleteRole === "TEACHER" ? "teacher" : "admin";
+  const modalTitle =
+    mode === "create-admin" ? "Add admin" : editingRole === "TEACHER" ? "Edit teacher" : "Edit admin";
+
   return (
     <div className="foundations">
       <div className="card foundations__card">
         <div className="foundations__page-head">
           <div>
             <h1 style={{ margin: 0 }}>All Users</h1>
-            <p className="foundations__lead">Monitor system-wide users (SUPER_ADMIN only).</p>
+            <p className="foundations__lead">
+              Manage admins and teachers — activate, deactivate, edit, or delete (SUPER_ADMIN only).
+            </p>
           </div>
         </div>
 
@@ -126,17 +273,21 @@ export function Users() {
         </div>
 
         <div className="foundations__toolbar">
-          <div className="foundations__toolbar-left" style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+          <div className="foundations__toolbar-left">
             <input
+              className="foundations__filter-control"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder="Search name / email…"
-              style={{ border: "1px solid #d1d5db", borderRadius: 10, padding: "10px 12px", minWidth: 220 }}
+              aria-label="Search users"
             />
+          </div>
+          <div className="foundations__toolbar-right">
             <select
+              className="foundations__filter-control"
               value={role}
               onChange={(e) => setRole(e.target.value)}
-              style={{ border: "1px solid #d1d5db", borderRadius: 10, padding: "10px 12px" }}
+              aria-label="Filter by role"
             >
               <option value="">All roles</option>
               <option value="SUPER_ADMIN">SUPER_ADMIN</option>
@@ -144,14 +295,18 @@ export function Users() {
               <option value="TEACHER">TEACHER</option>
             </select>
             <select
+              className="foundations__filter-control"
               value={active}
               onChange={(e) => setActive(e.target.value)}
-              style={{ border: "1px solid #d1d5db", borderRadius: 10, padding: "10px 12px" }}
+              aria-label="Filter by status"
             >
               <option value="">All status</option>
               <option value="true">Active</option>
               <option value="false">Inactive</option>
             </select>
+            <button className="foundations__btn" type="button" onClick={openCreateAdmin}>
+              + Add admin
+            </button>
           </div>
         </div>
 
@@ -166,18 +321,20 @@ export function Users() {
                 <th>Email</th>
                 <th>Role</th>
                 <th>Status</th>
+                <th style={{ width: 100 }}>Actions</th>
               </tr>
             </thead>
             <tbody>
               {rows.length === 0 ? (
                 <tr>
-                  <td colSpan={4} className="foundations__empty">
+                  <td colSpan={5} className="foundations__empty">
                     No users found.
                   </td>
                 </tr>
               ) : (
                 rows.map((u) => {
-                  const isActive = asBool((u as any).is_active ?? true);
+                  const isActiveRow = asBool(u.is_active ?? true);
+                  const manageable = canManage(u);
                   return (
                     <tr key={u.id}>
                       <td>
@@ -185,7 +342,38 @@ export function Users() {
                       </td>
                       <td>{safeStr(u.email) || "—"}</td>
                       <td>{safeStr(u.role) || "—"}</td>
-                      <td>{isActive ? <span className="foundations__badge">Active</span> : <span className="foundations__badge foundations__badge--danger">Inactive</span>}</td>
+                      <td>
+                        {isActiveRow ? (
+                          <span className="foundations__badge">Active</span>
+                        ) : (
+                          <span className="foundations__badge foundations__badge--danger">Inactive</span>
+                        )}
+                      </td>
+                      <td>
+                        {manageable ? (
+                          <div className="foundations__actions">
+                            <button
+                              type="button"
+                              className="foundations__icon-btn"
+                              onClick={() => openEdit(u)}
+                              aria-label="Edit"
+                            >
+                              <IconEdit />
+                            </button>
+                            <button
+                              type="button"
+                              className="foundations__icon-btn foundations__icon-btn--danger"
+                              disabled={deleting}
+                              onClick={() => askDelete(u)}
+                              aria-label="Delete"
+                            >
+                              <IconTrash />
+                            </button>
+                          </div>
+                        ) : (
+                          <span className="foundations__muted">—</span>
+                        )}
+                      </td>
                     </tr>
                   );
                 })
@@ -193,8 +381,70 @@ export function Users() {
             </tbody>
           </table>
         </div>
+
+        <Modal
+          open={open}
+          title={modalTitle}
+          onClose={() => setOpen(false)}
+          footer={
+            <div className="foundations__modal-actions">
+              <button className="foundations__btn foundations__btn--ghost" type="button" onClick={() => setOpen(false)}>
+                Cancel
+              </button>
+              <button className="foundations__btn" type="button" disabled={saving} onClick={() => void submit()}>
+                {saving ? "Saving…" : "Save"}
+              </button>
+            </div>
+          }
+        >
+          <div className="foundations__form">
+            <label className="foundations__field">
+              <span>Name</span>
+              <input value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. John Doe" />
+            </label>
+            <label className="foundations__field">
+              <span>Email</span>
+              <input value={email} onChange={(e) => setEmail(e.target.value)} placeholder="user@ius.edu" />
+            </label>
+            {mode === "create-admin" ? (
+              <label className="foundations__field">
+                <span>Password</span>
+                <input value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Set a password" />
+              </label>
+            ) : (
+              <>
+                {editingRole === "TEACHER" ? (
+                  <label className="foundations__field">
+                    <span>Employee ID</span>
+                    <input
+                      value={employeeId}
+                      onChange={(e) => setEmployeeId(e.target.value)}
+                      placeholder="Optional"
+                    />
+                  </label>
+                ) : null}
+                <label className="foundations__field">
+                  <span>Status</span>
+                  <select value={String(isActive)} onChange={(e) => setIsActive(e.target.value === "true")}>
+                    <option value="true">Active</option>
+                    <option value="false">Inactive</option>
+                  </select>
+                </label>
+              </>
+            )}
+            {formError ? <div className="foundations__error">{formError}</div> : null}
+          </div>
+        </Modal>
+
+        <ConfirmModal
+          open={Boolean(pendingDelete)}
+          title={`Delete ${deleteLabel}`}
+          message={`Delete ${deleteLabel} "${pendingDelete?.name ?? pendingDelete?.email ?? pendingDelete?.id ?? ""}"? This cannot be undone.`}
+          busy={deleting}
+          onClose={() => setPendingDelete(null)}
+          onConfirm={() => void confirmDelete()}
+        />
       </div>
     </div>
   );
 }
-

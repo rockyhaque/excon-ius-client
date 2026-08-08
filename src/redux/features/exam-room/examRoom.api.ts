@@ -11,7 +11,17 @@ export const examRoomApi = baseApi.injectEndpoints({
     }),
     generateExamRoutine: builder.mutation<
       { message: string; summary: Record<string, unknown> },
-      { semester_id: string; start_date: string; end_date: string; start_time: string; end_time: string; skip_weekends?: boolean; replace?: boolean }
+      {
+        semester_id: string;
+        exam_type: "MIDTERM" | "FINAL";
+        start_date: string;
+        end_date: string;
+        start_time: string;
+        end_time: string;
+        skip_weekends?: boolean;
+        replace?: boolean;
+        students_per_section?: number;
+      }
     >({
       query: (data) => ({ url: "/exam-room/exams/generate-routine", method: "POST", data }),
       invalidatesTags: ["EXAMS"],

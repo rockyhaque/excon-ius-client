@@ -3,8 +3,7 @@ import { toast } from "react-toastify";
 import "@/styles/overview.css";
 import { Modal } from "@/components/ui/Modal";
 import { IconEdit, IconTrash } from "@/components/ui/Icons";
-import { AreaChart, ChartCard, DonutChart, HBarList, VIZ } from "@/components/overview/charts";
-import { bucketByDate, countBy, isUpcoming } from "@/utils/stats";
+import { isUpcoming } from "@/utils/stats";
 import { getErrorMessage } from "@/utils/getErrorMessage";
 import {
   useCreateExamMutation,
@@ -28,7 +27,6 @@ export function ExamsPanel() {
   const { data: rowsRaw = [], isLoading, error } = useGetExamsQuery({ limit: 100 });
   const rows = useMemo(() => mapExams(rowsRaw), [rowsRaw]);
 
-  // ── Stats & chart data ────────────────────────────────────────
   const statusCounts = useMemo(() => {
     const c = { SCHEDULED: 0, RESCHEDULED: 0, PENDING: 0, CANCELLED: 0 } as Record<string, number>;
     rows.forEach((e) => {
@@ -40,17 +38,6 @@ export function ExamsPanel() {
 
   const upcomingCount = useMemo(() => rows.filter((e) => isUpcoming(e.exam_date)).length, [rows]);
   const deptsCovered = useMemo(() => new Set(rows.map((e) => e.dept).filter(Boolean)).size, [rows]);
-  const scheduleDensity = useMemo(() => bucketByDate(rows, (e) => e.exam_date, 20), [rows]);
-  const examsByDept = useMemo(() => countBy(rows, (e) => e.dept, 8), [rows]);
-  const statusSlices = useMemo(
-    () => [
-      { label: "Scheduled", value: statusCounts.SCHEDULED, color: VIZ.blue },
-      { label: "Rescheduled", value: statusCounts.RESCHEDULED, color: VIZ.warning },
-      { label: "Pending", value: statusCounts.PENDING, color: VIZ.neutral },
-      { label: "Cancelled", value: statusCounts.CANCELLED, color: VIZ.critical },
-    ],
-    [statusCounts],
-  );
 
   const { data: depsRaw = [] } = useGetDepartmentsQuery({ limit: 100 });
   const { data: batchesRaw = [] } = useGetBatchesQuery({ limit: 100 });
@@ -235,18 +222,6 @@ export function ExamsPanel() {
               <div className="ov-kpi__label">Departments covered</div>
               <div className="ov-kpi__value">{deptsCovered.toLocaleString()}</div>
             </div>
-          </div>
-
-          <div className="ov-grid" style={{ marginBottom: 20 }}>
-            <ChartCard title="Schedule density" subtitle="Exams scheduled per date" wide>
-              <AreaChart data={scheduleDensity} />
-            </ChartCard>
-            <ChartCard title="Exam status" subtitle="Lifecycle of the current exams">
-              <DonutChart centerLabel="exams" data={statusSlices} />
-            </ChartCard>
-            <ChartCard title="Exams per department" subtitle="Where the exam load sits">
-              <HBarList data={examsByDept} unit="exams" />
-            </ChartCard>
           </div>
         </>
       ) : null}
