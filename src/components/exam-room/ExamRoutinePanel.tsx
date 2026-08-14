@@ -8,6 +8,7 @@ import { getErrorMessage } from "@/utils/getErrorMessage";
 import { useGetSemestersQuery, useCreateSemesterMutation } from "@/redux/features/foundations/foundations.api";
 import {
   useGetExamsQuery,
+  useGetRoomsQuery,
   useGenerateExamRoutineMutation,
   useUpdateExamMutation,
   useDeleteExamMutation,
@@ -41,6 +42,7 @@ type ExamRow = {
   status: string;
   exam_type: string;
   expected_students: number | null;
+  room_id: string;
   room_name: string;
   room_building: string;
   room_capacity: number | null;
@@ -87,6 +89,7 @@ export function ExamRoutinePanel() {
         status: s(e.status),
         exam_type: s(e.exam_type),
         expected_students: e.expected_students == null ? null : Number(e.expected_students),
+        room_id: s(e.room_id),
         room_name: s(e.room_name),
         room_building: s(e.room_building),
         room_capacity: e.room_capacity == null ? null : Number(e.room_capacity),
@@ -240,7 +243,18 @@ export function ExamRoutinePanel() {
   const [eStart, setEStart] = useState("");
   const [eEnd, setEEnd] = useState("");
   const [eStatus, setEStatus] = useState("SCHEDULED");
+  const [eStudents, setEStudents] = useState<number | "">("");
+  const [eRoomId, setERoomId] = useState("");
   const [editError, setEditError] = useState<string | null>(null);
+
+  const { data: roomsRaw } = useGetRoomsQuery({ limit: 200 });
+  const roomOptions = useMemo(() => {
+    const list = Array.isArray(roomsRaw) ? roomsRaw : ((roomsRaw as { data?: unknown[] } | undefined)?.data ?? []);
+    return (list as Record<string, unknown>[])
+      .filter((r) => !r.is_defect)
+      .map((r) => ({ id: s(r.id), name: s(r.name), capacity: r.capacity == null ? null : Number(r.capacity) }))
+      .sort((a, b) => a.name.localeCompare(b.name));
+  }, [roomsRaw]);
 
   const openEdit = (r: ExamRow) => {
     setEditing(r);
@@ -248,6 +262,8 @@ export function ExamRoutinePanel() {
     setEStart(r.start_time.slice(0, 5));
     setEEnd(r.end_time.slice(0, 5));
     setEStatus(r.status || "SCHEDULED");
+    setEStudents(r.expected_students ?? "");
+    setERoomId(r.room_id || "");
     setEditError(null);
   };
 
@@ -255,10 +271,20 @@ export function ExamRoutinePanel() {
     if (!editing) return;
     setEditError(null);
     if (!eDate || !eStart || !eEnd) return setEditError("Date, start and end time are required.");
+    if (eStudents !== "" && (!Number.isFinite(Number(eStudents)) || Number(eStudents) < 0)) {
+      return setEditError("Expected students must be 0 or more.");
+    }
     try {
       await updateExam({
         id: editing.id,
-        data: { exam_date: eDate, start_time: eStart, end_time: eEnd, status: eStatus },
+        data: {
+          exam_date: eDate,
+          start_time: eStart,
+          end_time: eEnd,
+          status: eStatus,
+          expected_students: eStudents === "" ? null : Number(eStudents),
+          room_id: eRoomId || null,
+        },
       }).unwrap();
       setEditing(null);
       toast.success("Exam updated.");
@@ -710,6 +736,32 @@ export function ExamRoutinePanel() {
                 <option value="RESCHEDULED">Rescheduled</option>
                 <option value="PENDING">Pending</option>
                 <option value="CANCELLED">Cancelled</option>
+              </select>
+            </label>
+            <label className="foundations__field">
+              <span>Expected students (actual headcount for seating)</span>
+              <input
+                type="number"
+                min={0}
+                value={eStudents}
+                onChange={(e) => setEStudents(e.target.value === "" ? "" : Number(e.target.value))}
+                placeholder="e.g. 38"
+              />
+            </label>
+            <label className="foundations__field">
+              <span>Seating room</span>
+              <select value={eRoomId} onChange={(e) => setERoomId(e.target.value)}>
+                <option value="">— No room —</option>
+                {roomOptions.map((r) => {
+                  const over = eStudents !== "" && r.capacity != null && Number(eStudents) > r.capacity;
+                  return (
+                    <option key={r.id} value={r.id}>
+                      {r.name}
+                      {r.capacity != null ? ` (cap ${r.capacity})` : ""}
+                      {over ? " — over capacity" : ""}
+                    </option>
+                  );
+                })}
               </select>
             </label>
             {editError ? <div className="foundations__error">{editError}</div> : null}

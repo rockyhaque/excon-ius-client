@@ -20,6 +20,7 @@ import { TeacherOverview } from "@/pages/teacher/TeacherOverview";
 import { Availability } from "@/pages/teacher/Availability";
 import { Leaves } from "@/pages/teacher/Leaves";
 import { MyAllocation } from "@/pages/teacher/MyAllocation";
+import { ExamSchedule } from "@/pages/teacher/ExamSchedule";
 import { Assistant } from "@/pages/Assistant";
 
 export const router = createBrowserRouter([
@@ -71,6 +72,7 @@ export const router = createBrowserRouter([
     Component: withAuth(TeacherShell, [role.teacher, role.superAdmin]),
     children: [
       { index: true, Component: TeacherOverview },
+      { path: "schedule", Component: ExamSchedule },
       { path: "availability", Component: Availability },
       { path: "leaves", Component: Leaves },
       { path: "allocation", Component: MyAllocation },
