@@ -148,9 +148,13 @@ export function ExamRoutinePanel() {
   const [newYear, setNewYear] = useState(2026);
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
-  const [startTime, setStartTime] = useState("09:00");
-  const [endTime, setEndTime] = useState("12:00");
+  const [slots, setSlots] = useState<{ start: string; end: string }[]>([{ start: "09:00", end: "12:00" }]);
   const [studentsPerSection, setStudentsPerSection] = useState(40);
+
+  const updateSlot = (i: number, field: "start" | "end", val: string) =>
+    setSlots((prev) => prev.map((sl, idx) => (idx === i ? { ...sl, [field]: val } : sl)));
+  const addSlot = () => setSlots((prev) => [...prev, { start: "14:00", end: "17:00" }]);
+  const removeSlot = (i: number) => setSlots((prev) => (prev.length > 1 ? prev.filter((_, idx) => idx !== i) : prev));
   const [skipWeekends, setSkipWeekends] = useState(true);
   const [replace, setReplace] = useState(false);
   const [genError, setGenError] = useState<string | null>(null);
@@ -164,8 +168,7 @@ export function ExamRoutinePanel() {
     setNewYear(2026);
     setStartDate("");
     setEndDate("");
-    setStartTime("09:00");
-    setEndTime("12:00");
+    setSlots([{ start: "09:00", end: "12:00" }]);
     setStudentsPerSection(40);
     setSkipWeekends(true);
     setReplace(false);
@@ -175,10 +178,28 @@ export function ExamRoutinePanel() {
 
   const submitGenerate = async () => {
     setGenError(null);
-    if (!startDate || !endDate || !startTime || !endTime) return setGenError("Date range and time slot are required.");
+    if (!startDate || !endDate) return setGenError("Date range is required.");
     if (endDate < startDate) return setGenError("End date must be on or after start date.");
     if (!Number.isFinite(studentsPerSection) || studentsPerSection < 1) {
       return setGenError("Students per section must be at least 1.");
+    }
+    // Validate the daily slots: each start < end, and no two slots overlap (else a batch could
+    // sit two exams at once). Mirrors the server-side guard so the user gets fast feedback.
+    const toMin = (t: string) => {
+      const [h, m] = t.split(":").map(Number);
+      return (h || 0) * 60 + (m || 0);
+    };
+    if (slots.length === 0 || slots.some((sl) => !sl.start || !sl.end)) {
+      return setGenError("Every time slot needs a start and end time.");
+    }
+    if (slots.some((sl) => toMin(sl.end) <= toMin(sl.start))) {
+      return setGenError("Each slot's end time must be after its start time.");
+    }
+    const sortedSlots = [...slots].sort((a, b) => toMin(a.start) - toMin(b.start));
+    for (let i = 1; i < sortedSlots.length; i++) {
+      if (toMin(sortedSlots[i].start) < toMin(sortedSlots[i - 1].end)) {
+        return setGenError("Time slots must not overlap.");
+      }
     }
     try {
       let sid = genSem;
@@ -197,8 +218,7 @@ export function ExamRoutinePanel() {
         exam_type: examType,
         start_date: startDate,
         end_date: endDate,
-        start_time: startTime,
-        end_time: endTime,
+        slots: sortedSlots.map((sl) => ({ start_time: sl.start, end_time: sl.end })),
         skip_weekends: skipWeekends,
         replace,
         students_per_section: studentsPerSection,
@@ -585,14 +605,39 @@ export function ExamRoutinePanel() {
             <span>End date</span>
             <input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} />
           </label>
-          <label className="foundations__field">
-            <span>Daily start time</span>
-            <input type="time" value={startTime} onChange={(e) => setStartTime(e.target.value)} />
-          </label>
-          <label className="foundations__field">
-            <span>Daily end time</span>
-            <input type="time" value={endTime} onChange={(e) => setEndTime(e.target.value)} />
-          </label>
+          <div className="foundations__field">
+            <span>Daily time slots</span>
+            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+              {slots.map((sl, i) => (
+                <div key={i} style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                  <input type="time" value={sl.start} onChange={(e) => updateSlot(i, "start", e.target.value)} />
+                  <span className="foundations__muted" style={{ margin: 0 }}>to</span>
+                  <input type="time" value={sl.end} onChange={(e) => updateSlot(i, "end", e.target.value)} />
+                  <button
+                    type="button"
+                    className="foundations__btn foundations__btn--ghost"
+                    style={{ padding: "6px 10px" }}
+                    onClick={() => removeSlot(i)}
+                    disabled={slots.length === 1}
+                    aria-label={`Remove slot ${i + 1}`}
+                  >
+                    Remove
+                  </button>
+                </div>
+              ))}
+              <button
+                type="button"
+                className="foundations__btn foundations__btn--ghost"
+                style={{ alignSelf: "flex-start", padding: "6px 10px" }}
+                onClick={addSlot}
+              >
+                + Add slot
+              </button>
+            </div>
+          </div>
+          <p className="foundations__muted" style={{ margin: 0 }}>
+            Add a second slot (e.g. an afternoon session) to schedule more exams per day. Slots must not overlap.
+          </p>
           <label className="foundations__field">
             <span>Students per section (for room seating)</span>
             <input

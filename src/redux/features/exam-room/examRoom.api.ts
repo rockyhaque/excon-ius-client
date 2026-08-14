@@ -16,8 +16,10 @@ export const examRoomApi = baseApi.injectEndpoints({
         exam_type: "MIDTERM" | "FINAL";
         start_date: string;
         end_date: string;
-        start_time: string;
-        end_time: string;
+        start_time?: string;
+        end_time?: string;
+        /** One or more non-overlapping daily slots (morning, afternoon, …). */
+        slots?: { start_time: string; end_time: string }[];
         skip_weekends?: boolean;
         replace?: boolean;
         students_per_section?: number;
