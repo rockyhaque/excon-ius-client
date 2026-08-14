@@ -12,6 +12,7 @@ import "@/redux/features/exam-room/examRoom.api";
 import "@/redux/features/leaves/leaves.api";
 import "@/redux/features/allocations/allocations.api";
 import "@/redux/features/logs/logs.api";
+import "@/redux/features/assistant/assistant.api";
 
 export const store = configureStore({
   reducer: {

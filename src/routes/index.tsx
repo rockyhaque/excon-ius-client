@@ -20,6 +20,7 @@ import { TeacherOverview } from "@/pages/teacher/TeacherOverview";
 import { Availability } from "@/pages/teacher/Availability";
 import { Leaves } from "@/pages/teacher/Leaves";
 import { MyAllocation } from "@/pages/teacher/MyAllocation";
+import { Assistant } from "@/pages/Assistant";
 
 export const router = createBrowserRouter([
   { path: "/", Component: RootRedirect },
@@ -39,6 +40,7 @@ export const router = createBrowserRouter([
       { path: "exams-rooms", Component: ExamsRooms },
       { path: "allocations", Component: Allocations },
       { path: "leaves", Component: LeaveRequests },
+      { path: "assistant", Component: Assistant },
       { path: "logs", Component: Logs },
       { path: "*", element: <Navigate to="/admin" replace /> },
     ],
@@ -56,6 +58,7 @@ export const router = createBrowserRouter([
       { path: "exams-rooms", Component: ExamsRooms },
       { path: "allocations", Component: Allocations },
       { path: "leaves", Component: LeaveRequests },
+      { path: "assistant", Component: Assistant },
       { path: "logs", Component: SuperAdminLogs },
       { path: "*", element: <Navigate to="/super-admin" replace /> },
     ],
@@ -71,6 +74,7 @@ export const router = createBrowserRouter([
       { path: "availability", Component: Availability },
       { path: "leaves", Component: Leaves },
       { path: "allocation", Component: MyAllocation },
+      { path: "assistant", Component: Assistant },
       { path: "*", element: <Navigate to="/teacher" replace /> },
     ],
   },

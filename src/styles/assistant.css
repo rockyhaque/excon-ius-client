@@ -1,0 +1,239 @@
+.assistant {
+  width: 100%;
+  max-width: 900px;
+  margin: 0 auto;
+}
+
+.assistant__card {
+  display: flex;
+  flex-direction: column;
+  height: calc(100vh - 72px);
+  min-height: 480px;
+  padding: 18px;
+}
+
+.assistant__head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  flex-shrink: 0;
+}
+
+.assistant__title {
+  margin: 0;
+  font-size: 22px;
+}
+
+.assistant__lead {
+  margin: 4px 0 0;
+  font-size: 0.9rem;
+  color: #6b7280;
+  max-width: 60ch;
+}
+
+.assistant__clear {
+  flex-shrink: 0;
+  color: #5c0931 !important;
+  border-color: #e5cdd9 !important;
+  padding: 6px 10px !important;
+  font-size: 0.85rem;
+}
+
+.assistant__notice {
+  margin-top: 10px;
+  color: #6b7280;
+}
+
+.assistant__notice code {
+  background: #f3f4f6;
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+  padding: 1px 6px;
+  font-size: 0.85em;
+}
+
+/* ── Thread ─────────────────────────────────────────────── */
+.assistant__thread {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  margin: 14px 0;
+  padding: 6px 4px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.assistant__empty {
+  margin: auto 0;
+  text-align: center;
+  padding: 12px;
+}
+
+.assistant__greeting {
+  font-size: 1.05rem;
+  color: #374151;
+  margin-bottom: 16px;
+}
+
+.assistant__suggestions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: center;
+}
+
+.assistant__chip {
+  appearance: none;
+  cursor: pointer;
+  background: #fbf5f8;
+  border: 1px solid #e7cdd9;
+  color: #5c0931;
+  border-radius: 999px;
+  padding: 8px 14px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  transition: background 0.15s ease, transform 0.05s ease;
+}
+
+.assistant__chip:hover:not(:disabled) {
+  background: #f3e3ec;
+}
+
+.assistant__chip:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.assistant__msg {
+  display: flex;
+  max-width: 100%;
+}
+
+.assistant__msg--user {
+  justify-content: flex-end;
+}
+
+.assistant__msg--bot {
+  justify-content: flex-start;
+}
+
+.assistant__bubble {
+  max-width: 78%;
+  padding: 10px 14px;
+  border-radius: 14px;
+  font-size: 0.92rem;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.assistant__msg--user .assistant__bubble {
+  background: #5c0931;
+  color: #fff;
+  border-bottom-right-radius: 4px;
+}
+
+.assistant__msg--bot .assistant__bubble {
+  background: #f1f0f3;
+  color: #1f2937;
+  border: 1px solid #e5e7eb;
+  border-bottom-left-radius: 4px;
+}
+
+/* Typing indicator */
+.assistant__bubble--typing {
+  display: inline-flex;
+  gap: 4px;
+  align-items: center;
+}
+
+.assistant__bubble--typing span {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #9ca3af;
+  animation: assistant-bounce 1.2s infinite ease-in-out;
+}
+
+.assistant__bubble--typing span:nth-child(2) {
+  animation-delay: 0.15s;
+}
+
+.assistant__bubble--typing span:nth-child(3) {
+  animation-delay: 0.3s;
+}
+
+@keyframes assistant-bounce {
+  0%, 60%, 100% {
+    transform: translateY(0);
+    opacity: 0.5;
+  }
+  30% {
+    transform: translateY(-4px);
+    opacity: 1;
+  }
+}
+
+.assistant__error {
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  color: #b91c1c;
+  border-radius: 10px;
+  padding: 8px 12px;
+  font-size: 0.85rem;
+  margin-bottom: 8px;
+}
+
+/* ── Composer ───────────────────────────────────────────── */
+.assistant__composer {
+  display: flex;
+  gap: 8px;
+  align-items: flex-end;
+  flex-shrink: 0;
+}
+
+.assistant__input {
+  flex: 1;
+  resize: none;
+  max-height: 160px;
+  min-height: 44px;
+  border: 1px solid #d1d5db;
+  border-radius: 12px;
+  padding: 11px 14px;
+  font: inherit;
+  font-size: 0.92rem;
+  line-height: 1.4;
+  color: #111827;
+  background: #fff;
+  outline: none;
+}
+
+.assistant__input:focus {
+  border-color: #5c0931;
+  box-shadow: 0 0 0 3px rgba(92, 9, 49, 0.12);
+}
+
+.assistant__send {
+  flex-shrink: 0;
+  min-width: 76px;
+  height: 44px;
+}
+
+.assistant__disclaimer {
+  flex-shrink: 0;
+  margin: 8px 2px 0;
+  font-size: 0.75rem;
+  color: #9ca3af;
+  text-align: center;
+}
+
+@media (max-width: 920px) {
+  .assistant__card {
+    height: calc(100vh - 48px);
+  }
+  .assistant__bubble {
+    max-width: 88%;
+  }
+}

@@ -5,6 +5,7 @@ const items = [
   { to: "/teacher/availability", label: "Availability" },
   { to: "/teacher/leaves", label: "Leaves" },
   { to: "/teacher/allocation", label: "My Allocation" },
+  { to: "/teacher/assistant", label: "AI Assistant" },
 ];
 
 export function TeacherShell() {
