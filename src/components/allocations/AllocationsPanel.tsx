@@ -19,7 +19,14 @@ import {
 import { useGetRoomsQuery } from "@/redux/features/exam-room/examRoom.api";
 import { mapAllocations, mapWorkload, type AllocationRow } from "@/components/allocations/allocations.types";
 
-type AiSummary = { total_assigned: number; skipped_no_room: number; skipped_no_teacher: number };
+type AiSummary = {
+  total_assigned: number;
+  skipped_no_room: number;
+  skipped_no_teacher: number;
+  exams_fully_staffed: number;
+  exams_partial: number;
+  students_per_invigilator: number;
+};
 
 type Tab = "draft" | "published";
 type RoomOption = { id: string; name: string; capacity: number | null; is_defect: boolean };
@@ -289,7 +296,10 @@ export function AllocationsPanel() {
     try {
       const res = (await triggerAi().unwrap()) as {
         message?: string;
-        summary?: { total_assigned?: number; skipped_no_room?: number; skipped_no_teacher?: number };
+        summary?: {
+          total_assigned?: number; skipped_no_room?: number; skipped_no_teacher?: number;
+          exams_fully_staffed?: number; exams_partial?: number; students_per_invigilator?: number;
+        };
       };
       const s = res.summary;
       if (s) {
@@ -297,10 +307,13 @@ export function AllocationsPanel() {
           total_assigned: toCount(s.total_assigned),
           skipped_no_room: toCount(s.skipped_no_room),
           skipped_no_teacher: toCount(s.skipped_no_teacher),
+          exams_fully_staffed: toCount(s.exams_fully_staffed),
+          exams_partial: toCount(s.exams_partial),
+          students_per_invigilator: toCount(s.students_per_invigilator),
         };
         setAiSummary(summary);
         const skipped = summary.skipped_no_room + summary.skipped_no_teacher;
-        toast.success(`Draft routine generated — ${summary.total_assigned} assigned, ${skipped} skipped.`);
+        toast.success(`Draft routine generated — ${summary.total_assigned} duties assigned, ${skipped} exam(s) skipped.`);
       } else {
         setAiSummary(null);
         toast.success(res.message ?? "Draft routine generated.");
@@ -403,9 +416,16 @@ export function AllocationsPanel() {
             }}
           >
             <strong style={{ marginRight: 4 }}>Last generation:</strong>
-            <SummaryPill color={VIZ.good} label="assigned" value={aiSummary.total_assigned} />
+            <SummaryPill color={VIZ.good} label="duties assigned" value={aiSummary.total_assigned} />
+            <SummaryPill color={VIZ.blue} label="halls fully staffed" value={aiSummary.exams_fully_staffed} />
+            <SummaryPill color={VIZ.warning} label="halls short-staffed" value={aiSummary.exams_partial} />
             <SummaryPill color={VIZ.warning} label="skipped — no room" value={aiSummary.skipped_no_room} />
             <SummaryPill color={VIZ.critical} label="skipped — no teacher" value={aiSummary.skipped_no_teacher} />
+            {aiSummary.students_per_invigilator ? (
+              <span className="foundations__muted" style={{ margin: 0 }}>
+                (~1 invigilator per {aiSummary.students_per_invigilator} students)
+              </span>
+            ) : null}
           </div>
         ) : null}
 
