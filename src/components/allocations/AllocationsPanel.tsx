@@ -11,13 +11,22 @@ import {
   useGetAiAllocationQuery,
   useGetAllocationReportsQuery,
   useGetPublishedAllocationsQuery,
-  useLazyExportAllocationReportQuery,
   useLazyGetTeacherInfoQuery,
   usePublishAllocationMutation,
   useTriggerAiAllocationMutation,
 } from "@/redux/features/allocations/allocations.api";
 import { useGetRoomsQuery } from "@/redux/features/exam-room/examRoom.api";
 import { mapAllocations, mapWorkload, type AllocationRow } from "@/components/allocations/allocations.types";
+import type { PublishedAllocationRow } from "@/types/teacher";
+import {
+  allocationCsv,
+  buildDutySlipsHtml,
+  buildHallPacketsHtml,
+  deptsOf,
+  downloadCsv,
+  printDocument,
+  stampName,
+} from "@/utils/exports";
 
 type AiSummary = {
   total_assigned: number;
@@ -238,7 +247,11 @@ export function AllocationsPanel() {
   const [triggerAi, { isLoading: generating }] = useTriggerAiAllocationMutation();
   const [publish, { isLoading: publishing }] = usePublishAllocationMutation();
   const [editAllocation, { isLoading: saving }] = useEditAllocationMutation();
-  const [exportReport, { isFetching: exporting }] = useLazyExportAllocationReportQuery();
+  // Published duties for the export suite (kept subscribed regardless of the active tab).
+  const exportQuery = useGetPublishedAllocationsQuery();
+  const exportRows = useMemo(() => (exportQuery.data ?? []) as PublishedAllocationRow[], [exportQuery.data]);
+  const exportDepts = useMemo(() => deptsOf(exportRows), [exportRows]);
+  const [exportDept, setExportDept] = useState("");
   const [searchTeachers, teacherSearch] = useLazyGetTeacherInfoQuery();
 
   // ── Reassign (manual override) modal ──────────────────────────────
@@ -339,22 +352,23 @@ export function AllocationsPanel() {
     }
   };
 
-  const onExport = async () => {
-    try {
-      const csv = await exportReport().unwrap();
-      const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `IUS_Invigilation_Routine_${new Date().toISOString().slice(0, 10)}.csv`;
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      URL.revokeObjectURL(url);
-      toast.success("Report exported.");
-    } catch (e: unknown) {
-      toast.error(getErrorMessage(e, "Could not export report."));
-    }
+  const noRowsToast = () => toast.info("No published duties to export yet. Publish the routine first.");
+
+  const onExportCsv = () => {
+    if (exportRows.length === 0) return noRowsToast();
+    const { header, rows } = allocationCsv(exportRows, { dept: exportDept });
+    downloadCsv(stampName(exportDept ? `Invigilation_${exportDept}` : "Invigilation_Routine", "csv"), header, rows);
+    toast.success("Invigilation routine exported.");
+  };
+  const onDutySlips = () => {
+    if (exportRows.length === 0) return noRowsToast();
+    if (!printDocument("Duty Slips", buildDutySlipsHtml(exportRows, { dept: exportDept })))
+      toast.error("Pop-up blocked — allow pop-ups to export.");
+  };
+  const onHallPackets = () => {
+    if (exportRows.length === 0) return noRowsToast();
+    if (!printDocument("Hall Packets", buildHallPacketsHtml(exportRows, { dept: exportDept })))
+      toast.error("Pop-up blocked — allow pop-ups to export.");
   };
 
   const teacherResults = teacherSearch.data ?? [];
@@ -452,14 +466,39 @@ export function AllocationsPanel() {
 
         <div className="foundations__toolbar">
           <div className="foundations__toolbar-left">
+            <span className="foundations__muted" style={{ margin: 0 }}>Exports for teachers &amp; staff</span>
+          </div>
+          <div className="foundations__toolbar-right">
+            <select
+              className="foundations__filter-control"
+              value={exportDept}
+              onChange={(e) => setExportDept(e.target.value)}
+              aria-label="Department filter for exports"
+            >
+              <option value="">All departments</option>
+              {exportDepts.map((d) => (
+                <option key={d} value={d}>{d}</option>
+              ))}
+            </select>
+            <button className="foundations__btn foundations__btn--ghost" type="button" onClick={onExportCsv} disabled={exportRows.length === 0}>
+              Routine CSV
+            </button>
+            <button className="foundations__btn foundations__btn--ghost" type="button" onClick={onDutySlips} disabled={exportRows.length === 0}>
+              Duty slips (PDF)
+            </button>
+            <button className="foundations__btn foundations__btn--ghost" type="button" onClick={onHallPackets} disabled={exportRows.length === 0}>
+              Hall packets (PDF)
+            </button>
+          </div>
+        </div>
+
+        <div className="foundations__toolbar">
+          <div className="foundations__toolbar-left">
             <span className="foundations__muted" style={{ margin: 0 }}>
               Draft allocations stay private until you publish them.
             </span>
           </div>
           <div className="foundations__toolbar-right">
-            <button className="foundations__btn foundations__btn--ghost" type="button" onClick={() => void onExport()} disabled={exporting}>
-              {exporting ? "Exporting…" : "Export CSV"}
-            </button>
             <button className="foundations__btn foundations__btn--ghost" type="button" onClick={() => void onGenerate()} disabled={generating}>
               {generating ? "Generating…" : "Generate routine"}
             </button>

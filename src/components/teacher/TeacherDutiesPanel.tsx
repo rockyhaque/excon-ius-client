@@ -1,11 +1,13 @@
 import "@/styles/teacher.css";
 import "@/styles/overview.css";
 import { useMemo, useState } from "react";
+import { toast } from "react-toastify";
 import { useGetPublishedAllocationsQuery } from "@/redux/features/allocations/allocations.api";
 import type { PublishedAllocationRow } from "@/types/teacher";
 import { useSkipTeacherApi } from "@/hooks/useTeacherProfile";
 import { ChartCard, DonutChart, VIZ } from "@/components/overview/charts";
 import { countBy, hoursBetween, isUpcoming, num } from "@/utils/stats";
+import { buildDutySlipsHtml, printDocument } from "@/utils/exports";
 
 const CYCLE = [VIZ.blue, VIZ.orange, VIZ.good, VIZ.warning, VIZ.critical, VIZ.neutral];
 
@@ -54,6 +56,15 @@ export function TeacherDutiesPanel({ teacherId }: { teacherId: string | null }) 
     [mine],
   );
 
+  const onDutySlip = () => {
+    if (mine.length === 0) {
+      toast.info("You have no published duties to export yet.");
+      return;
+    }
+    if (!printDocument("My Duty Slip", buildDutySlipsHtml(mine)))
+      toast.error("Pop-up blocked — allow pop-ups to download your duty slip.");
+  };
+
   return (
     <div className="foundations">
       <div className="card foundations__card">
@@ -62,6 +73,14 @@ export function TeacherDutiesPanel({ teacherId }: { teacherId: string | null }) 
             <h2>My allocation</h2>
             <p className="foundations__lead">Published invigilation duties assigned to you.</p>
           </div>
+          <button
+            type="button"
+            className="foundations__btn foundations__btn--ghost"
+            onClick={onDutySlip}
+            disabled={mine.length === 0}
+          >
+            Download duty slip (PDF)
+          </button>
         </div>
 
       {!teacherId ? (

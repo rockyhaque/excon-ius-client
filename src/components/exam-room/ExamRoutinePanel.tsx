@@ -12,6 +12,7 @@ import {
   useUpdateExamMutation,
   useDeleteExamMutation,
 } from "@/redux/features/exam-room/examRoom.api";
+import { deptsOf, downloadCsv, stampName, timetableCsv } from "@/utils/exports";
 
 const s = (v: unknown) => (v == null ? "" : String(v));
 const arr = (x: unknown): Record<string, unknown>[] => {
@@ -55,6 +56,7 @@ export function ExamRoutinePanel() {
 
   const [semesterId, setSemesterId] = useState("");
   const [viewType, setViewType] = useState<ExamType | "">("");
+  const [deptFilter, setDeptFilter] = useState("");
 
   useEffect(() => {
     if (!semesterId && semesters.length > 0) {
@@ -92,9 +94,15 @@ export function ExamRoutinePanel() {
     [examsRaw],
   );
 
+  const deptOptions = useMemo(() => deptsOf(rows), [rows]);
+  const viewRows = useMemo(
+    () => (deptFilter ? rows.filter((r) => r.dept === deptFilter) : rows),
+    [rows, deptFilter],
+  );
+
   const groups = useMemo(() => {
     const m = new Map<string, ExamRow[]>();
-    rows.forEach((r) => {
+    viewRows.forEach((r) => {
       const g = m.get(r.exam_date) ?? [];
       g.push(r);
       m.set(r.exam_date, g);
@@ -113,18 +121,18 @@ export function ExamRoutinePanel() {
             ),
           ] as const,
       );
-  }, [rows]);
+  }, [viewRows]);
 
   const statusCounts = useMemo(() => {
     const c = { SCHEDULED: 0, RESCHEDULED: 0, PENDING: 0, CANCELLED: 0 } as Record<string, number>;
-    rows.forEach((r) => {
+    viewRows.forEach((r) => {
       const st = (r.status || "").toUpperCase();
       if (st in c) c[st]++;
     });
     return c;
-  }, [rows]);
-  const deptsCovered = useMemo(() => new Set(rows.map((r) => r.dept).filter(Boolean)).size, [rows]);
-  const roomsSeated = useMemo(() => rows.filter((r) => r.room_name).length, [rows]);
+  }, [viewRows]);
+  const deptsCovered = useMemo(() => new Set(viewRows.map((r) => r.dept).filter(Boolean)).size, [viewRows]);
+  const roomsSeated = useMemo(() => viewRows.filter((r) => r.room_name).length, [viewRows]);
 
   const [generate, { isLoading: generating }] = useGenerateExamRoutineMutation();
   const [createSemester] = useCreateSemesterMutation();
@@ -291,7 +299,7 @@ export function ExamRoutinePanel() {
       </style></head>
       <body>
         <h1>University of Scholars — Exam Routine</h1>
-        <div class="meta">${heading} · ${rows.length} exam(s) · Generated ${esc(new Date().toLocaleDateString())}</div>
+        <div class="meta">${heading}${deptFilter ? " · " + esc(deptFilter) : ""} · ${viewRows.length} exam(s) · Generated ${esc(new Date().toLocaleDateString())}</div>
         ${body || "<p>No exams to print.</p>"}
         <script>window.onload = function(){ window.print(); }</script>
       </body></html>`;
@@ -300,6 +308,13 @@ export function ExamRoutinePanel() {
     if (!w) return toast.error("Pop-up blocked — allow pop-ups to export the PDF.");
     w.document.write(html);
     w.document.close();
+  };
+
+  const exportCsv = () => {
+    if (viewRows.length === 0) return toast.error("No exams to export.");
+    const { header, rows: body } = timetableCsv(viewRows);
+    downloadCsv(stampName(deptFilter ? `Exam_Timetable_${deptFilter}` : "Exam_Timetable", "csv"), header, body);
+    toast.success("Timetable exported.");
   };
 
   return (
@@ -334,8 +349,24 @@ export function ExamRoutinePanel() {
             <option value="MIDTERM">Midterm</option>
             <option value="FINAL">Final</option>
           </select>
-          <button className="foundations__btn foundations__btn--ghost" type="button" onClick={exportPdf} disabled={rows.length === 0}>
+          <select
+            className="foundations__filter-control"
+            value={deptFilter}
+            onChange={(e) => setDeptFilter(e.target.value)}
+            aria-label="Department filter"
+          >
+            <option value="">All departments</option>
+            {deptOptions.map((d) => (
+              <option key={d} value={d}>
+                {d}
+              </option>
+            ))}
+          </select>
+          <button className="foundations__btn foundations__btn--ghost" type="button" onClick={exportPdf} disabled={viewRows.length === 0}>
             Export PDF
+          </button>
+          <button className="foundations__btn foundations__btn--ghost" type="button" onClick={exportCsv} disabled={viewRows.length === 0}>
+            Export CSV
           </button>
           <button className="foundations__btn" type="button" onClick={openGenerate} disabled={generating}>
             {generating ? "Generating…" : "Generate routine"}
@@ -351,12 +382,18 @@ export function ExamRoutinePanel() {
         </div>
       ) : null}
 
-      {rows.length > 0 ? (
+      {!isLoading && rows.length > 0 && viewRows.length === 0 ? (
+        <div className="foundations__empty" style={{ border: "1px solid #e5e7eb", borderRadius: 12, background: "#fff" }}>
+          No exams for {deptFilter}. Choose another department.
+        </div>
+      ) : null}
+
+      {viewRows.length > 0 ? (
         <>
           <div className="ov-kpis" style={{ marginBottom: 16 }}>
             <div className="ov-kpi">
               <div className="ov-kpi__label">Total exams</div>
-              <div className="ov-kpi__value">{rows.length.toLocaleString()}</div>
+              <div className="ov-kpi__value">{viewRows.length.toLocaleString()}</div>
             </div>
             <div className="ov-kpi">
               <div className="ov-kpi__label">Exam days</div>
