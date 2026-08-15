@@ -10,6 +10,7 @@ import {
   useEditAllocationMutation,
   useGetAiAllocationQuery,
   useGetAllocationReportsQuery,
+  useGetAllocationConflictsQuery,
   useGetPublishedAllocationsQuery,
   useLazyGetTeacherInfoQuery,
   usePublishAllocationMutation,
@@ -180,6 +181,17 @@ export function AllocationsPanel() {
 
   const draftRows = useMemo(() => mapAllocations(draftQuery.data), [draftQuery.data]);
   const publishedRows = useMemo(() => mapAllocations(publishedQuery.data), [publishedQuery.data]);
+
+  // Post-publish reconciliation: published duties that have gone bad (leave/cancelled/clash/etc.).
+  const { data: conflictsRaw = [] } = useGetAllocationConflictsQuery();
+  const conflicts = useMemo(
+    () =>
+      (conflictsRaw as Array<Record<string, unknown> & { reasons?: string[] }>).map((c) => ({
+        row: mapAllocations([c])[0],
+        reasons: Array.isArray(c.reasons) ? c.reasons : [],
+      })),
+    [conflictsRaw],
+  );
 
   const rooms = useMemo<RoomOption[]>(() => {
     // GET /exam-room/rooms is paginated → { data: [...] }; tolerate a bare array too.
@@ -413,6 +425,87 @@ export function AllocationsPanel() {
             </div>
           </div>
         </div>
+
+        {conflicts.length > 0 ? (
+          <div
+            role="alert"
+            style={{
+              margin: "0 0 16px",
+              border: `1px solid ${VIZ.critical}`,
+              borderRadius: 10,
+              background: "#fef2f2",
+              padding: "12px 14px",
+            }}
+          >
+            <div style={{ display: "flex", alignItems: "baseline", gap: 8, flexWrap: "wrap", marginBottom: 10 }}>
+              <strong style={{ color: VIZ.critical }}>
+                {conflicts.length} published dut{conflicts.length === 1 ? "y" : "ies"} need attention
+              </strong>
+              <span className="foundations__muted" style={{ margin: 0, fontSize: 13 }}>
+                Something changed after publishing — review and reassign.
+              </span>
+            </div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+              {conflicts.map(({ row, reasons }) => (
+                <div
+                  key={row.id}
+                  style={{
+                    display: "flex",
+                    flexWrap: "wrap",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    gap: 8,
+                    background: "#fff",
+                    border: `1px solid ${VIZ.grid}`,
+                    borderRadius: 8,
+                    padding: "8px 10px",
+                  }}
+                >
+                  <div style={{ minWidth: 0 }}>
+                    <div style={{ fontWeight: 600 }}>
+                      {row.teacher_name}
+                      {row.employee_id ? (
+                        <span className="foundations__muted" style={{ margin: 0 }}> · {row.employee_id}</span>
+                      ) : null}
+                    </div>
+                    <div className="foundations__muted" style={{ margin: 0, fontSize: 13 }}>
+                      {row.course_code} · {fmtDate(row.exam_date)} · {fmtTime(row.start_time)}–{fmtTime(row.end_time)}
+                      {row.room_name ? ` · ${row.room_name}` : ""}
+                    </div>
+                  </div>
+                  <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
+                    {reasons.map((rz) => (
+                      <span
+                        key={rz}
+                        style={{
+                          fontSize: 12,
+                          fontWeight: 600,
+                          color: "#fff",
+                          background: VIZ.critical,
+                          borderRadius: 999,
+                          padding: "2px 9px",
+                        }}
+                      >
+                        {rz}
+                      </span>
+                    ))}
+                    <button
+                      className="foundations__btn foundations__btn--ghost"
+                      type="button"
+                      style={{ padding: "6px 10px" }}
+                      onClick={() => {
+                        setTab("published");
+                        openEdit(row);
+                      }}
+                    >
+                      Reassign
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        ) : null}
 
         {aiSummary ? (
           <div
