@@ -333,6 +333,7 @@ export function ExamRoutinePanel() {
     const html = `<!doctype html><html><head><meta charset="utf-8"/><title>${heading} — Exam Routine</title>
       <style>
         * { box-sizing: border-box; }
+        html, body { background: #fff; }
         body { font-family: system-ui, -apple-system, "Segoe UI", sans-serif; color: #111827; padding: 28px; }
         h1 { margin: 0 0 2px; font-size: 20px; }
         .meta { color: #6b7280; font-size: 12px; margin-bottom: 18px; }

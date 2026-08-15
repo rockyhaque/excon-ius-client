@@ -75,6 +75,8 @@ export const deptsOf = (rows: DeptRow[]): string[] =>
 // ── PDF (print) + CSV (download) primitives ────────────────────────────────
 const PRINT_STYLES = `
   * { box-sizing: border-box; }
+  /* Explicit light background so a dark-mode browser doesn't auto-darken the printable page. */
+  html, body { background: #fff; }
   body { font-family: system-ui, -apple-system, "Segoe UI", sans-serif; color: #111827; padding: 28px; }
   h1 { margin: 0 0 2px; font-size: 19px; }
   h1.brand { color: #5c0931; }
