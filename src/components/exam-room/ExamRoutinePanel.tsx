@@ -216,16 +216,38 @@ export function ExamRoutinePanel() {
         sid = s((created as Record<string, unknown>).id);
       }
       if (!sid) return setGenError("Please choose or create a semester.");
-      const res = await generate({
-        semester_id: sid,
-        exam_type: examType,
-        start_date: startDate,
-        end_date: endDate,
-        slots: sortedSlots.map((sl) => ({ start_time: sl.start, end_time: sl.end })),
-        skip_weekends: skipWeekends,
-        replace,
-        students_per_section: studentsPerSection,
-      }).unwrap();
+      const doGenerate = (confirmReplace: boolean) =>
+        generate({
+          semester_id: sid,
+          exam_type: examType,
+          start_date: startDate,
+          end_date: endDate,
+          slots: sortedSlots.map((sl) => ({ start_time: sl.start, end_time: sl.end })),
+          skip_weekends: skipWeekends,
+          replace,
+          ...(confirmReplace ? { confirm_replace: true } : {}),
+          students_per_section: studentsPerSection,
+        }).unwrap();
+
+      let res;
+      try {
+        res = await doGenerate(false);
+      } catch (e: unknown) {
+        // When replacing, the server returns 409 if published invigilation duties would be
+        // cascade-deleted. Surface the count and let the admin confirm the destructive regenerate.
+        const status = (e as { status?: number })?.status;
+        if (replace && status === 409) {
+          const warning = getErrorMessage(e, "Regenerating will delete existing exams and their invigilation duties.");
+          if (!window.confirm(`${warning}\n\nDelete them and regenerate?`)) {
+            setGenError("Regeneration cancelled — nothing was changed.");
+            return;
+          }
+          res = await doGenerate(true);
+        } else {
+          throw e;
+        }
+      }
+
       setSemesterId(sid);
       setViewType(examType);
       setGenOpen(false);

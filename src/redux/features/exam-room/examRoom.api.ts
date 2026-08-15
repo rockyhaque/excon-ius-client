@@ -22,6 +22,8 @@ export const examRoomApi = baseApi.injectEndpoints({
         slots?: { start_time: string; end_time: string }[];
         skip_weekends?: boolean;
         replace?: boolean;
+        /** Acknowledge that replacing will delete already-published invigilation duties. */
+        confirm_replace?: boolean;
         students_per_section?: number;
       }
     >({
