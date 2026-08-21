@@ -25,6 +25,8 @@ export const examRoomApi = baseApi.injectEndpoints({
         /** Acknowledge that replacing will delete already-published invigilation duties. */
         confirm_replace?: boolean;
         students_per_section?: number;
+        /** Scope generation to one department; omit for all departments. */
+        dept_id?: string;
       }
     >({
       query: (data) => ({ url: "/exam-room/exams/generate-routine", method: "POST", data }),

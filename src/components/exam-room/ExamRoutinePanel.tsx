@@ -5,7 +5,7 @@ import { Modal } from "@/components/ui/Modal";
 import { ConfirmModal } from "@/components/ui/ConfirmModal";
 import { IconEdit, IconTrash } from "@/components/ui/Icons";
 import { getErrorMessage } from "@/utils/getErrorMessage";
-import { useGetSemestersQuery, useCreateSemesterMutation } from "@/redux/features/foundations/foundations.api";
+import { useGetSemestersQuery, useCreateSemesterMutation, useGetDepartmentsQuery } from "@/redux/features/foundations/foundations.api";
 import {
   useGetExamsQuery,
   useGetRoomsQuery,
@@ -176,6 +176,12 @@ export function ExamRoutinePanel() {
     [semRaw],
   );
 
+  const { data: deptRaw } = useGetDepartmentsQuery();
+  const genDepartments = useMemo(
+    () => arr(deptRaw).map((x) => ({ id: s(x.id), name: s(x.name) })).filter((d) => d.id && d.name),
+    [deptRaw],
+  );
+
   const [semesterId, setSemesterId] = useState("");
   const [viewType, setViewType] = useState<ExamType | "">("");
   const [deptFilter, setDeptFilter] = useState("");
@@ -267,6 +273,7 @@ export function ExamRoutinePanel() {
   const [mode, setMode] = useState<"existing" | "new">("existing");
   const [genSem, setGenSem] = useState("");
   const [examType, setExamType] = useState<ExamType>("MIDTERM");
+  const [genDept, setGenDept] = useState(""); // "" = all departments
   const [newName, setNewName] = useState("");
   const [newSeason, setNewSeason] = useState("FALL");
   const [newYear, setNewYear] = useState(2026);
@@ -287,6 +294,7 @@ export function ExamRoutinePanel() {
     setMode(semesters.length ? "existing" : "new");
     setGenSem(semesterId || semesters[0]?.id || "");
     setExamType((viewType as ExamType) || "MIDTERM");
+    setGenDept("");
     setNewName("");
     setNewSeason("FALL");
     setNewYear(2026);
@@ -347,6 +355,7 @@ export function ExamRoutinePanel() {
           skip_weekends: skipWeekends,
           replace,
           ...(confirmReplace ? { confirm_replace: true } : {}),
+          ...(genDept ? { dept_id: genDept } : {}),
           students_per_section: studentsPerSection,
         }).unwrap();
 
@@ -815,6 +824,18 @@ export function ExamRoutinePanel() {
           </label>
 
           <label className="foundations__field">
+            <span>Department</span>
+            <select value={genDept} onChange={(e) => setGenDept(e.target.value)}>
+              <option value="">All departments</option>
+              {genDepartments.map((d) => (
+                <option key={d.id} value={d.id}>
+                  {d.name}
+                </option>
+              ))}
+            </select>
+          </label>
+
+          <label className="foundations__field">
             <span>Start date</span>
             <input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} />
           </label>
@@ -878,7 +899,7 @@ export function ExamRoutinePanel() {
           <label style={{ display: "flex", alignItems: "center", gap: 10 }}>
             <input type="checkbox" checked={replace} onChange={(e) => setReplace(e.target.checked)} />
             <span className="foundations__muted" style={{ margin: 0 }}>
-              Replace this semester’s existing {examType} exams
+              Replace existing {examType} exams {genDept ? "for the selected department" : "for this semester"}
             </span>
           </label>
 
