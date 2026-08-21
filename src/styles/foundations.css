@@ -412,9 +412,15 @@
   border: 1px solid #e5e7eb;
   box-shadow: 0 18px 50px rgba(0, 0, 0, 0.25);
   overflow: hidden;
+  /* Cap to the viewport (overlay has 16px padding top+bottom) and lay out as a column so a tall
+     form scrolls inside the body while the header and footer buttons stay pinned in view. */
+  display: flex;
+  flex-direction: column;
+  max-height: calc(100vh - 32px);
 }
 
 .modal__header {
+  flex: 0 0 auto;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -441,9 +447,14 @@
 
 .modal__body {
   padding: 14px;
+  /* Scroll here when the content is taller than the viewport; min-height:0 lets a flex child shrink. */
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
 }
 
 .modal__footer {
+  flex: 0 0 auto;
   padding: 12px 14px;
   border-top: 1px solid #f3f4f6;
   background: #fafafa;
