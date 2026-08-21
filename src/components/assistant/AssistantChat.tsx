@@ -27,6 +27,7 @@ const TEACHER_SUGGESTIONS = [
 
 /** Compact circular meter of the daily message allowance — a "fuel gauge" that empties as it's used. */
 function UsageRing({ limit, remaining }: AssistantUsage) {
+  const [showTip, setShowTip] = useState(false);
   const size = 46;
   const stroke = 4;
   const r = (size - stroke) / 2;
@@ -39,9 +40,13 @@ function UsageRing({ limit, remaining }: AssistantUsage) {
 
   return (
     <div
-      title={`${remaining} of ${limit} messages left today`}
       aria-label={`${remaining} of ${limit} daily messages left`}
-      style={{ display: "inline-flex", alignItems: "center", gap: 8, flexShrink: 0 }}
+      tabIndex={0}
+      onMouseEnter={() => setShowTip(true)}
+      onMouseLeave={() => setShowTip(false)}
+      onFocus={() => setShowTip(true)}
+      onBlur={() => setShowTip(false)}
+      style={{ position: "relative", display: "inline-flex", alignItems: "center", gap: 8, flexShrink: 0, outline: "none" }}
     >
       <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} role="img" aria-hidden="true">
         <circle cx={center} cy={center} r={r} fill="none" stroke="#ece2e8" strokeWidth={stroke} />
@@ -83,6 +88,28 @@ function UsageRing({ limit, remaining }: AssistantUsage) {
           </>
         )}
       </span>
+      {showTip && (
+        <div
+          role="tooltip"
+          style={{
+            position: "absolute",
+            top: "calc(100% + 8px)",
+            right: 0,
+            zIndex: 30,
+            whiteSpace: "nowrap",
+            background: "#241a20",
+            color: "#fff",
+            fontSize: 12,
+            fontWeight: 500,
+            padding: "7px 11px",
+            borderRadius: 8,
+            boxShadow: "0 8px 22px rgba(36, 26, 32, 0.28)",
+            pointerEvents: "none",
+          }}
+        >
+          {remaining} of {limit} messages left today · resets at midnight
+        </div>
+      )}
     </div>
   );
 }
