@@ -25,6 +25,68 @@ const TEACHER_SUGGESTIONS = [
   "What are the leaves I have on record?",
 ];
 
+/** Compact circular meter of the daily message allowance — a "fuel gauge" that empties as it's used. */
+function UsageRing({ limit, remaining }: AssistantUsage) {
+  const size = 46;
+  const stroke = 4;
+  const r = (size - stroke) / 2;
+  const circumference = 2 * Math.PI * r;
+  const frac = limit > 0 ? Math.max(0, Math.min(1, remaining / limit)) : 0;
+  const offset = circumference * (1 - frac);
+  const low = remaining <= Math.max(1, Math.ceil(limit * 0.2));
+  const color = remaining <= 0 ? "#b91c1c" : low ? "#b45309" : "#5c0931";
+  const center = size / 2;
+
+  return (
+    <div
+      title={`${remaining} of ${limit} messages left today`}
+      aria-label={`${remaining} of ${limit} daily messages left`}
+      style={{ display: "inline-flex", alignItems: "center", gap: 8, flexShrink: 0 }}
+    >
+      <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} role="img" aria-hidden="true">
+        <circle cx={center} cy={center} r={r} fill="none" stroke="#ece2e8" strokeWidth={stroke} />
+        <circle
+          cx={center}
+          cy={center}
+          r={r}
+          fill="none"
+          stroke={color}
+          strokeWidth={stroke}
+          strokeLinecap="round"
+          strokeDasharray={circumference}
+          strokeDashoffset={offset}
+          transform={`rotate(-90 ${center} ${center})`}
+          style={{ transition: "stroke-dashoffset .45s ease, stroke .3s ease" }}
+        />
+        <text
+          x="50%"
+          y="50%"
+          textAnchor="middle"
+          dominantBaseline="central"
+          style={{ fontSize: 14, fontWeight: 700, fill: color }}
+        >
+          {remaining}
+        </text>
+      </svg>
+      <span style={{ fontSize: 11, lineHeight: 1.2, color: "#6b7280", fontWeight: 600 }}>
+        {remaining <= 0 ? (
+          <>
+            daily limit
+            <br />
+            reached
+          </>
+        ) : (
+          <>
+            left
+            <br />
+            today
+          </>
+        )}
+      </span>
+    </div>
+  );
+}
+
 export function AssistantChat() {
   const { user, role } = useAuth();
   const isTeacher = role === "TEACHER";
@@ -119,24 +181,8 @@ export function AssistantChat() {
               from your live Excon-IUS data.
             </p>
           </div>
-          <div style={{ display: "flex", alignItems: "center", gap: 10, flexShrink: 0 }}>
-            {usage && (
-              <span
-                title={`Daily message limit: ${usage.limit}`}
-                style={{
-                  fontSize: 12,
-                  fontWeight: 600,
-                  whiteSpace: "nowrap",
-                  color: limitReached ? "#b91c1c" : "#5c0931",
-                  background: limitReached ? "#fef2f2" : "#f4e4ed",
-                  border: `1px solid ${limitReached ? "#fecaca" : "#e7cdd9"}`,
-                  borderRadius: 999,
-                  padding: "4px 10px",
-                }}
-              >
-                {limitReached ? "Daily limit reached" : `${usage.remaining} of ${usage.limit} left today`}
-              </span>
-            )}
+          <div style={{ display: "flex", alignItems: "center", gap: 14, flexShrink: 0 }}>
+            {usage && <UsageRing {...usage} />}
             {messages.length > 0 && (
               <button
                 type="button"
