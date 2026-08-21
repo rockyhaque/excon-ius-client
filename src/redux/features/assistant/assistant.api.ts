@@ -7,14 +7,22 @@ export type AssistantChatRequest = {
   history?: AssistantTurn[];
 };
 
+export type AssistantUsage = {
+  used: number;
+  limit: number;
+  remaining: number;
+};
+
 export type AssistantChatResponse = {
   answer: string;
   model: string;
+  usage?: AssistantUsage;
 };
 
 export type AssistantStatus = {
   configured: boolean;
   model: string | null;
+  usage?: AssistantUsage;
 };
 
 export const assistantApi = baseApi.injectEndpoints({

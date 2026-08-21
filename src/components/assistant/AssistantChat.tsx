@@ -3,6 +3,7 @@ import {
   useGetAssistantStatusQuery,
   useChatWithAssistantMutation,
   type AssistantTurn,
+  type AssistantUsage,
 } from "@/redux/features/assistant/assistant.api";
 import { useAuth } from "@/hooks/useAuth";
 import { getErrorMessage } from "@/utils/getErrorMessage";
@@ -35,6 +36,14 @@ export function AssistantChat() {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [usage, setUsage] = useState<AssistantUsage | null>(null);
+
+  // Seed the daily-usage counter from the status endpoint (and whenever it refetches).
+  useEffect(() => {
+    if (status?.usage) setUsage(status.usage);
+  }, [status]);
+
+  const limitReached = !!usage && usage.remaining <= 0;
 
   const scrollRef = useRef<HTMLDivElement | null>(null);
   useEffect(() => {
@@ -46,6 +55,10 @@ export function AssistantChat() {
   const send = async (raw: string) => {
     const message = raw.trim();
     if (!message || sending) return;
+    if (limitReached) {
+      setError("You've reached today's message limit. It resets tomorrow.");
+      return;
+    }
     setError(null);
 
     // Snapshot history BEFORE appending the new turn (what the server should see as prior context).
@@ -57,8 +70,13 @@ export function AssistantChat() {
     try {
       const res = await chat({ message, history }).unwrap();
       setMessages((prev) => [...prev, { role: "model", text: res.answer }]);
+      if (res.usage) setUsage(res.usage);
     } catch (err) {
       const msg = getErrorMessage(err, "The assistant could not answer that. Please try again.");
+      // A 429 means the daily cap was hit — reflect that in the counter so the input locks.
+      if ((err as { status?: number })?.status === 429) {
+        setUsage((u) => (u ? { ...u, used: u.limit, remaining: 0 } : u));
+      }
       setError(msg);
       setMessages((prev) => [...prev, { role: "model", text: `⚠️ ${msg}` }]);
     }
@@ -101,18 +119,37 @@ export function AssistantChat() {
               from your live Excon-IUS data.
             </p>
           </div>
-          {messages.length > 0 && (
-            <button
-              type="button"
-              className="btn btn--ghost assistant__clear"
-              onClick={() => {
-                setMessages([]);
-                setError(null);
-              }}
-            >
-              Clear chat
-            </button>
-          )}
+          <div style={{ display: "flex", alignItems: "center", gap: 10, flexShrink: 0 }}>
+            {usage && (
+              <span
+                title={`Daily message limit: ${usage.limit}`}
+                style={{
+                  fontSize: 12,
+                  fontWeight: 600,
+                  whiteSpace: "nowrap",
+                  color: limitReached ? "#b91c1c" : "#5c0931",
+                  background: limitReached ? "#fef2f2" : "#f4e4ed",
+                  border: `1px solid ${limitReached ? "#fecaca" : "#e7cdd9"}`,
+                  borderRadius: 999,
+                  padding: "4px 10px",
+                }}
+              >
+                {limitReached ? "Daily limit reached" : `${usage.remaining} of ${usage.limit} left today`}
+              </span>
+            )}
+            {messages.length > 0 && (
+              <button
+                type="button"
+                className="btn btn--ghost assistant__clear"
+                onClick={() => {
+                  setMessages([]);
+                  setError(null);
+                }}
+              >
+                Clear chat
+              </button>
+            )}
+          </div>
         </div>
 
         <div className="assistant__thread" ref={scrollRef}>
@@ -125,7 +162,7 @@ export function AssistantChat() {
                     key={s}
                     type="button"
                     className="assistant__chip"
-                    disabled={sending}
+                    disabled={sending || limitReached}
                     onClick={() => void send(s)}
                   >
                     {s}
@@ -160,14 +197,18 @@ export function AssistantChat() {
         <form className="assistant__composer" onSubmit={onSubmit}>
           <textarea
             className="assistant__input"
-            placeholder="Ask a question…  (Enter to send, Shift+Enter for a new line)"
+            placeholder={
+              limitReached
+                ? "Daily message limit reached — resets tomorrow."
+                : "Ask a question…  (Enter to send, Shift+Enter for a new line)"
+            }
             value={input}
             rows={1}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={onKeyDown}
-            disabled={sending}
+            disabled={sending || limitReached}
           />
-          <button type="submit" className="btn assistant__send" disabled={sending || !input.trim()}>
+          <button type="submit" className="btn assistant__send" disabled={sending || limitReached || !input.trim()}>
             {sending ? "…" : "Send"}
           </button>
         </form>
