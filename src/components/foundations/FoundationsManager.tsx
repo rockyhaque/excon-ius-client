@@ -5,21 +5,24 @@ import { DepartmentsPanel } from "@/components/foundations/DepartmentsPanel";
 import { BatchesPanel } from "@/components/foundations/BatchesPanel";
 import { SectionsPanel } from "@/components/foundations/SectionsPanel";
 import { CoursesPanel } from "@/components/foundations/CoursesPanel";
+import { SemestersPanel } from "@/components/foundations/SemestersPanel";
 import {
   useGetBatchesQuery,
   useGetCoursesQuery,
   useGetDepartmentsQuery,
   useGetSectionsQuery,
+  useGetSemestersQuery,
 } from "@/redux/features/foundations/foundations.api";
 import { mapBatches, mapCourses, mapDepartments, mapSections } from "@/components/foundations/foundations.types";
 
-type FoundationsTab = "departments" | "batches" | "sections" | "courses";
+type FoundationsTab = "departments" | "batches" | "sections" | "courses" | "semesters";
 
 const TAB_LABEL: Record<FoundationsTab, string> = {
   departments: "Departments",
   batches: "Batches",
   sections: "Sections",
   courses: "Courses",
+  semesters: "Semesters",
 };
 
 export function FoundationsManager() {
@@ -29,6 +32,7 @@ export function FoundationsManager() {
   const { data: batchesRaw = [] } = useGetBatchesQuery({ limit: 100 });
   const { data: sectionsRaw = [] } = useGetSectionsQuery({ limit: 100 });
   const { data: coursesRaw = [] } = useGetCoursesQuery({ limit: 100 });
+  const { data: semestersRaw = [] } = useGetSemestersQuery();
 
   const departments = mapDepartments(deptsRaw);
   const batches = mapBatches(batchesRaw);
@@ -40,6 +44,7 @@ export function FoundationsManager() {
     { label: "Batches", value: batches.length },
     { label: "Sections", value: sections.length },
     { label: "Courses", value: courses.length },
+    { label: "Semesters", value: (semestersRaw as unknown[]).length },
   ];
 
   return (
@@ -49,7 +54,7 @@ export function FoundationsManager() {
           <div>
             <h1 style={{ margin: 0 }}>Foundations</h1>
             <p className="foundations__lead" style={{ marginTop: 6 }}>
-              Manage departments, batches, sections, and courses.
+              Manage departments, batches, sections, courses, and semesters.
             </p>
           </div>
         </div>
@@ -84,8 +89,10 @@ export function FoundationsManager() {
           <BatchesPanel />
         ) : tab === "sections" ? (
           <SectionsPanel />
-        ) : (
+        ) : tab === "courses" ? (
           <CoursesPanel />
+        ) : (
+          <SemestersPanel />
         )}
       </div>
     </div>

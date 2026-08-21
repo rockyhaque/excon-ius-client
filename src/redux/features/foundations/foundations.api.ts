@@ -88,6 +88,14 @@ export const foundationsApi = baseApi.injectEndpoints({
       query: (data) => ({ url: "/foundations/semesters", method: "POST", data }),
       invalidatesTags: ["FOUNDATIONS"],
     }),
+    updateSemester: builder.mutation<FoundationEntity, { id: number | string; data: Record<string, unknown> }>({
+      query: ({ id, data }) => ({ url: `/foundations/semesters/${id}`, method: "PUT", data }),
+      invalidatesTags: ["FOUNDATIONS"],
+    }),
+    deleteSemester: builder.mutation<{ message: string }, number | string>({
+      query: (id) => ({ url: `/foundations/semesters/${id}`, method: "DELETE" }),
+      invalidatesTags: ["FOUNDATIONS"],
+    }),
     getBatchCourses: builder.query<FoundationEntity[], string>({
       query: (batchId) => ({ url: `/foundations/batches/${batchId}/courses`, method: "GET" }),
       transformResponse: normalizeListResponse,
@@ -119,6 +127,8 @@ export const {
   useDeleteCourseMutation,
   useGetSemestersQuery,
   useCreateSemesterMutation,
+  useUpdateSemesterMutation,
+  useDeleteSemesterMutation,
   useGetBatchCoursesQuery,
   useSetBatchCoursesMutation,
 } = foundationsApi;

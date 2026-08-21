@@ -5,7 +5,7 @@ import { Modal } from "@/components/ui/Modal";
 import { ConfirmModal } from "@/components/ui/ConfirmModal";
 import { IconEdit, IconTrash } from "@/components/ui/Icons";
 import { getErrorMessage } from "@/utils/getErrorMessage";
-import { useGetSemestersQuery, useCreateSemesterMutation, useGetDepartmentsQuery } from "@/redux/features/foundations/foundations.api";
+import { useGetSemestersQuery, useGetDepartmentsQuery } from "@/redux/features/foundations/foundations.api";
 import {
   useGetExamsQuery,
   useGetRoomsQuery,
@@ -265,18 +265,13 @@ export function ExamRoutinePanel() {
   const roomsSeated = useMemo(() => viewRows.filter((r) => r.room_name).length, [viewRows]);
 
   const [generate, { isLoading: generating }] = useGenerateExamRoutineMutation();
-  const [createSemester] = useCreateSemesterMutation();
   const [updateExam, { isLoading: saving }] = useUpdateExamMutation();
   const [deleteExam, { isLoading: deleting }] = useDeleteExamMutation();
 
   const [genOpen, setGenOpen] = useState(false);
-  const [mode, setMode] = useState<"existing" | "new">("existing");
   const [genSem, setGenSem] = useState("");
   const [examType, setExamType] = useState<ExamType>("MIDTERM");
   const [genDept, setGenDept] = useState(""); // "" = all departments
-  const [newName, setNewName] = useState("");
-  const [newSeason, setNewSeason] = useState("FALL");
-  const [newYear, setNewYear] = useState(2026);
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
   const [slots, setSlots] = useState<{ start: string; end: string }[]>([{ start: "09:00", end: "12:00" }]);
@@ -291,13 +286,9 @@ export function ExamRoutinePanel() {
   const [genError, setGenError] = useState<string | null>(null);
 
   const openGenerate = () => {
-    setMode(semesters.length ? "existing" : "new");
     setGenSem(semesterId || semesters[0]?.id || "");
     setExamType((viewType as ExamType) || "MIDTERM");
     setGenDept("");
-    setNewName("");
-    setNewSeason("FALL");
-    setNewYear(2026);
     setStartDate("");
     setEndDate("");
     setSlots([{ start: "09:00", end: "12:00" }]);
@@ -334,17 +325,8 @@ export function ExamRoutinePanel() {
       }
     }
     try {
-      let sid = genSem;
-      if (mode === "new") {
-        if (!newName.trim()) return setGenError("New semester name is required.");
-        const created = await createSemester({
-          name: newName.trim(),
-          season: newSeason,
-          year: Number(newYear),
-        }).unwrap();
-        sid = s((created as Record<string, unknown>).id);
-      }
-      if (!sid) return setGenError("Please choose or create a semester.");
+      const sid = genSem;
+      if (!sid) return setGenError("Choose a semester. Create one in Foundations → Semesters if there are none.");
       const doGenerate = (confirmReplace: boolean) =>
         generate({
           semester_id: sid,
@@ -765,55 +747,22 @@ export function ExamRoutinePanel() {
         }
       >
         <div className="foundations__form">
-          <div className="foundations__tabs" style={{ margin: 0 }}>
-            <button
-              type="button"
-              className={`foundations__tab ${mode === "existing" ? "foundations__tab--active" : ""}`}
-              onClick={() => setMode("existing")}
-            >
-              Existing semester
-            </button>
-            <button
-              type="button"
-              className={`foundations__tab ${mode === "new" ? "foundations__tab--active" : ""}`}
-              onClick={() => setMode("new")}
-            >
-              New semester
-            </button>
-          </div>
-
-          {mode === "existing" ? (
-            <label className="foundations__field">
-              <span>Semester (Spring / Fall)</span>
-              <select value={genSem} onChange={(e) => setGenSem(e.target.value)}>
-                {semesters.length === 0 ? <option value="">No semesters — create one</option> : null}
-                {semesters.map((sm) => (
-                  <option key={sm.id} value={sm.id}>
-                    {sm.name} ({sm.season})
-                  </option>
-                ))}
-              </select>
-            </label>
-          ) : (
-            <div className="foundations__form" style={{ gap: 12 }}>
-              <label className="foundations__field">
-                <span>New semester name</span>
-                <input value={newName} onChange={(e) => setNewName(e.target.value)} placeholder="e.g. Fall 2026" />
-              </label>
-              <label className="foundations__field">
-                <span>Season</span>
-                <select value={newSeason} onChange={(e) => setNewSeason(e.target.value)}>
-                  <option value="SPRING">Spring</option>
-                  <option value="SUMMER">Summer</option>
-                  <option value="FALL">Fall</option>
-                </select>
-              </label>
-              <label className="foundations__field">
-                <span>Year</span>
-                <input type="number" value={newYear} onChange={(e) => setNewYear(Number(e.target.value))} min={2020} max={2100} />
-              </label>
-            </div>
-          )}
+          <label className="foundations__field">
+            <span>Semester</span>
+            <select value={genSem} onChange={(e) => setGenSem(e.target.value)}>
+              {semesters.length === 0 ? <option value="">No semesters yet</option> : null}
+              {semesters.map((sm) => (
+                <option key={sm.id} value={sm.id}>
+                  {sm.name} ({sm.season})
+                </option>
+              ))}
+            </select>
+          </label>
+          {semesters.length === 0 ? (
+            <p className="foundations__muted" style={{ margin: "-4px 0 0" }}>
+              No semesters yet — create one in <strong>Foundations → Semesters</strong>, then it will appear here.
+            </p>
+          ) : null}
 
           <label className="foundations__field">
             <span>Exam type</span>
