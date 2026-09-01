@@ -10,7 +10,7 @@ import {
   useUpdateSectionMutation,
 } from "@/redux/features/foundations/foundations.api";
 import { mapBatches, mapSections } from "@/components/foundations/foundations.types";
-import type { Section } from "@/types/foundations";
+import type { Section, BatchStatus } from "@/types/foundations";
 import { IconEdit, IconTrash } from "@/components/ui/Icons";
 import { SortableTh, useSort, sortSign } from "@/components/foundations/tableSort";
 import { toast } from "react-toastify";
@@ -26,9 +26,16 @@ export function SectionsPanel() {
     return batches.map((b) => ({ id: b.id, label: `${b.dept_name ?? "Dept"} · ${b.name ?? b.number ?? "—"}` }));
   }, [batchesRaw]);
 
+  const batchStatusById = useMemo(() => {
+    const m = new Map<string, BatchStatus>();
+    for (const b of mapBatches(batchesRaw)) m.set(String(b.id), b.status === "COMPLETED" ? "COMPLETED" : "RUNNING");
+    return m;
+  }, [batchesRaw]);
+
   const rows = mapSections(rowsRaw);
 
   const [filterDept, setFilterDept] = useState<string>("");
+  const [filterStatus, setFilterStatus] = useState<"" | BatchStatus>("RUNNING");
   const [filterBatch, setFilterBatch] = useState<string>("");
   const { sort, onSort } = useSort<SectionSortKey>("batch", "desc");
 
@@ -38,16 +45,22 @@ export function SectionsPanel() {
   );
   const batchFilterOptions = useMemo(
     () =>
-      Array.from(new Set(rows.map((s) => s.batch_name).filter((b): b is string => !!b))).sort(
-        (a, b) => Number(a) - Number(b),
-      ),
-    [rows],
+      Array.from(
+        new Set(
+          rows
+            .filter((s) => (filterStatus ? batchStatusById.get(String(s.batch_id)) === filterStatus : true))
+            .map((s) => s.batch_name)
+            .filter((b): b is string => !!b),
+        ),
+      ).sort((a, b) => Number(a) - Number(b)),
+    [rows, filterStatus, batchStatusById],
   );
 
   const viewRows = useMemo(() => {
     const sign = sortSign(sort.dir);
     return rows
       .filter((s) => (filterDept ? s.dept_name === filterDept : true))
+      .filter((s) => (filterStatus ? batchStatusById.get(String(s.batch_id)) === filterStatus : true))
       .filter((s) => (filterBatch ? s.batch_name === filterBatch : true))
       .sort((a, b) => {
         let primary = 0;
@@ -58,7 +71,7 @@ export function SectionsPanel() {
         // stable tiebreak, always ascending: keep sections grouped by batch then letter
         return Number(a.batch_name ?? 0) - Number(b.batch_name ?? 0) || (a.name ?? "").localeCompare(b.name ?? "");
       });
-  }, [rows, filterDept, filterBatch, sort]);
+  }, [rows, filterDept, filterStatus, filterBatch, sort, batchStatusById]);
 
   const [createSection, { isLoading: creating }] = useCreateSectionMutation();
   const [updateSection, { isLoading: updating }] = useUpdateSectionMutation();
@@ -142,6 +155,16 @@ export function SectionsPanel() {
                 {d}
               </option>
             ))}
+          </select>
+          <select
+            className="foundations__filter-control"
+            value={filterStatus}
+            onChange={(e) => setFilterStatus(e.target.value as "" | BatchStatus)}
+            aria-label="Filter by status"
+          >
+            <option value="">All statuses</option>
+            <option value="RUNNING">Running</option>
+            <option value="COMPLETED">Completed</option>
           </select>
           <select
             className="foundations__filter-control"
