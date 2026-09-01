@@ -374,6 +374,135 @@
   gap: 8px;
 }
 
+/* Batch multi-select dropdown (Generate exam routine) */
+.foundations__ms {
+  position: relative;
+  width: 100%;
+}
+
+.foundations__ms-trigger {
+  box-sizing: border-box;
+  width: 100%;
+  height: 42px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  border: 1px solid #d1d5db;
+  border-radius: 10px;
+  padding: 0 12px;
+  background: #fff;
+  color: #111827;
+  font: inherit;
+  cursor: pointer;
+  text-align: left;
+}
+
+.foundations__ms-trigger:hover:not(:disabled) {
+  border-color: #9ca3af;
+}
+
+.foundations__ms-trigger:disabled {
+  background: #f3f4f6;
+  color: #9ca3af;
+  cursor: not-allowed;
+}
+
+.foundations__ms-placeholder {
+  color: #9ca3af;
+}
+
+.foundations__ms-caret {
+  color: #6b7280;
+  font-size: 0.8rem;
+  flex: none;
+}
+
+.foundations__ms-panel {
+  position: absolute;
+  z-index: 40;
+  top: calc(100% + 6px);
+  left: 0;
+  right: 0;
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  box-shadow: 0 12px 32px rgba(17, 24, 39, 0.16);
+  overflow: hidden;
+}
+
+.foundations__ms-bar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 12px;
+  border-bottom: 1px solid #f3f4f6;
+  background: #fafafa;
+}
+
+.foundations__ms-link {
+  appearance: none;
+  background: none;
+  border: 0;
+  padding: 0;
+  font: inherit;
+  font-weight: 600;
+  color: #7a1230;
+  cursor: pointer;
+}
+
+.foundations__ms-link:hover {
+  text-decoration: underline;
+}
+
+.foundations__ms-count {
+  margin-left: auto;
+  font-size: 0.8rem;
+  color: #6b7280;
+}
+
+.foundations__ms-list {
+  max-height: 280px;
+  overflow-y: auto;
+  padding: 6px;
+}
+
+.foundations__ms-group + .foundations__ms-group {
+  margin-top: 4px;
+}
+
+.foundations__ms-group-label {
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: #6b7280;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding: 8px 8px 4px;
+}
+
+.foundations__ms-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 8px;
+  border-radius: 8px;
+  font-size: 0.9rem;
+  color: #111827;
+  cursor: pointer;
+}
+
+.foundations__ms-item:hover {
+  background: #f5f3f4;
+}
+
+.foundations__ms-item--on {
+  background: #fbeef2;
+}
+
+.foundations__ms-item input {
+  accent-color: #7a1230;
+}
+
 .foundations__modal-actions {
   display: flex;
   gap: 10px;

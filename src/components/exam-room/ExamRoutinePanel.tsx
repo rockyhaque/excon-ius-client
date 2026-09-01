@@ -1,11 +1,13 @@
 import { Fragment, useEffect, useMemo, useState } from "react";
 import { toast } from "react-toastify";
 import "@/styles/overview.css";
+import "@/styles/foundations.css";
 import { Modal } from "@/components/ui/Modal";
+import { BatchMultiSelect } from "@/components/exam-room/BatchMultiSelect";
 import { ConfirmModal } from "@/components/ui/ConfirmModal";
 import { getErrorMessage } from "@/utils/getErrorMessage";
 import { useGetSemestersQuery, useGetDepartmentsQuery, useGetBatchesQuery } from "@/redux/features/foundations/foundations.api";
-import { batchOptionLabel, mapBatches } from "@/components/foundations/foundations.types";
+import { mapBatches } from "@/components/foundations/foundations.types";
 import {
   useGetExamsQuery,
   useGetRoomsQuery,
@@ -339,8 +341,8 @@ export function ExamRoutinePanel() {
 
   const submitGenerate = async () => {
     setGenError(null);
-    if (genBatches.length === 0) {
-      return setGenError("No batches found. Create them in Foundations → Batches first.");
+    if (runningBatches.length === 0) {
+      return setGenError("No running batches to schedule. Completed batches don't sit exams — add or resume batches in Foundations → Batches.");
     }
     if (selectedBatchIds.size === 0) {
       return setGenError("Select at least one batch.");
@@ -792,66 +794,26 @@ export function ExamRoutinePanel() {
 
           <div className="foundations__field">
             <span>Batches</span>
-            {genBatches.length === 0 ? (
+            {runningBatches.length === 0 ? (
               <p className="foundations__muted" style={{ margin: 0 }}>
-                No batches yet — create them in <strong>Foundations → Batches</strong>.
+                No running batches{genDept ? " in this department" : ""} — completed batches don't sit exams. Add or resume
+                batches in <strong>Foundations → Batches</strong>.
               </p>
             ) : (
-              <div className="foundations__check-group">
-                {genDept || genDepartments.length === 0 ? (
-                  <div className="foundations__check-grid">
-                    {genBatches.map((b) => {
-                      const id = String(b.id);
-                      return (
-                        <label key={id} className="foundations__check-item">
-                          <input
-                            type="checkbox"
-                            checked={selectedBatchIds.has(id)}
-                            onChange={() => toggleBatch(id)}
-                          />
-                          <span>{batchOptionLabel(b)}</span>
-                        </label>
-                      );
-                    })}
-                  </div>
-                ) : (
-                  genDepartments.map((d) => {
-                    const list = genBatches.filter((b) => String(b.dept_id) === d.id);
-                    if (list.length === 0) return null;
-                    return (
-                      <div key={d.id}>
-                        <div className="foundations__check-dept">{d.name}</div>
-                        <div className="foundations__check-grid">
-                          {list.map((b) => {
-                            const id = String(b.id);
-                            return (
-                              <label key={id} className="foundations__check-item">
-                                <input
-                                  type="checkbox"
-                                  checked={selectedBatchIds.has(id)}
-                                  onChange={() => toggleBatch(id)}
-                                />
-                                <span>{batchOptionLabel(b)}</span>
-                              </label>
-                            );
-                          })}
-                        </div>
-                      </div>
-                    );
-                  })
-                )}
-                <div className="foundations__check-actions">
-                  <button type="button" className="foundations__btn foundations__btn--ghost" style={{ padding: "4px 10px" }} onClick={() => setAllBatches(true)}>
-                    Select running
-                  </button>
-                  <button type="button" className="foundations__btn foundations__btn--ghost" style={{ padding: "4px 10px" }} onClick={() => setAllBatches(false)}>
-                    Clear
-                  </button>
-                  <span className="foundations__muted" style={{ margin: 0 }}>
-                    {selectedBatchIds.size} selected · completed batches are listed but not auto-selected
-                  </span>
-                </div>
-              </div>
+              <>
+                <BatchMultiSelect
+                  batches={runningBatches}
+                  departments={genDepartments}
+                  groupByDept={!genDept && genDepartments.length > 0}
+                  selected={selectedBatchIds}
+                  onToggle={toggleBatch}
+                  onSelectAll={() => setAllBatches(true)}
+                  onClear={() => setAllBatches(false)}
+                />
+                <span className="foundations__muted" style={{ margin: "6px 0 0", fontSize: 12.5 }}>
+                  Only running batches are shown — completed batches don't sit exams.
+                </span>
+              </>
             )}
           </div>
 
