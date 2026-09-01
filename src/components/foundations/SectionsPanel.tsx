@@ -15,8 +15,8 @@ import { IconEdit, IconTrash } from "@/components/ui/Icons";
 import { toast } from "react-toastify";
 
 export function SectionsPanel() {
-  const { data: batchesRaw = [] } = useGetBatchesQuery();
-  const { data: rowsRaw = [], isLoading, error } = useGetSectionsQuery();
+  const { data: batchesRaw = [] } = useGetBatchesQuery({ limit: 500 });
+  const { data: rowsRaw = [], isLoading, error } = useGetSectionsQuery({ limit: 500 });
 
   const batchOptions = useMemo(() => {
     const batches = mapBatches(batchesRaw);

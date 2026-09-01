@@ -30,4 +30,13 @@ Server CORS must allow the Vite URL. In `excon-ius-server/.env` set:
 CLIENT_URL=http://localhost:5173
 ```
 
+## E2E (Playwright)
+
+Client-only. API calls are mocked, so the backend does not need to be running.
+
+```bash
+npx playwright install chromium
+npm run test:e2e
+```
+
 

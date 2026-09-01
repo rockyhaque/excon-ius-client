@@ -8,8 +8,8 @@ import {
   useGetLeaveRequestsQuery,
   useRejectLeaveMutation,
 } from "@/redux/features/leaves/leaves.api";
-import { AreaChart, ChartCard, DonutChart, HBarList, VIZ } from "@/components/overview/charts";
-import { bucketByDate, leaveDays, sumBy } from "@/utils/stats";
+import { ChartCard, HBarList, VIZ } from "@/components/overview/charts";
+import { leaveDays, sumBy } from "@/utils/stats";
 
 type LeaveRow = {
   id: number | string;
@@ -46,7 +46,7 @@ export function AdminLeaveRequestsPanel() {
   const [tab, setTab] = useState<"pending" | "all">("pending");
 
   const pendingQuery = useGetLeaveRequestsQuery(undefined, { skip: tab !== "pending" });
-  // History is fetched unconditionally so the stats + charts stay populated on both tabs.
+  // History is fetched unconditionally so the stats stay populated on both tabs.
   const allQuery = useGetLeaveHistoryQuery();
 
   const dataRaw = tab === "pending" ? pendingQuery.data : allQuery.data;
@@ -58,7 +58,7 @@ export function AdminLeaveRequestsPanel() {
     return (Array.isArray(list) ? list : []).map((r) => r as LeaveRow).slice().sort(byCreatedDesc);
   }, [dataRaw]);
 
-  // ── All-history rows drive the stat tiles and charts ──────────────
+  // All-history rows drive the stat tiles and leave-days chart.
   const allRows = useMemo(() => {
     const list = (allQuery.data ?? []) as unknown[];
     return (Array.isArray(list) ? list : []).map((r) => r as LeaveRow);
@@ -77,10 +77,6 @@ export function AdminLeaveRequestsPanel() {
 
   const daysByTeacher = useMemo(
     () => sumBy(allRows, (r) => String(r.teacher_name || ""), (r) => leaveDays(r.start_date, r.end_date), 12),
-    [allRows],
-  );
-  const requestsOverTime = useMemo(
-    () => bucketByDate(allRows, (r) => String(r.created_at || "")),
     [allRows],
   );
 
@@ -139,23 +135,8 @@ export function AdminLeaveRequestsPanel() {
         </div>
 
         <div className="ov-grid" style={{ marginBottom: 16 }}>
-          <ChartCard title="Leave status" subtitle="All requests by outcome">
-            <DonutChart
-              centerLabel="requests"
-              data={[
-                { label: "Approved", value: counts.APPROVED, color: VIZ.good },
-                { label: "Pending", value: counts.PENDING, color: VIZ.warning },
-                { label: "Rejected", value: counts.REJECTED, color: VIZ.critical },
-              ]}
-            />
-          </ChartCard>
-
           <ChartCard title="Leave days by teacher" subtitle="Total requested days (top 12)">
             <HBarList data={daysByTeacher} unit="days" />
-          </ChartCard>
-
-          <ChartCard title="Requests over time" subtitle="Leave requests by submission date" wide>
-            <AreaChart data={requestsOverTime} color={VIZ.orange} />
           </ChartCard>
         </div>
 

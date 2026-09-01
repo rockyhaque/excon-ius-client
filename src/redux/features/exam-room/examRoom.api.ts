@@ -27,6 +27,8 @@ export const examRoomApi = baseApi.injectEndpoints({
         students_per_section?: number;
         /** Scope generation to one department; omit for all departments. */
         dept_id?: string;
+        /** Scope generation to specific batches; omit for every batch in scope. */
+        batch_ids?: string[];
       }
     >({
       query: (data) => ({ url: "/exam-room/exams/generate-routine", method: "POST", data }),
@@ -54,6 +56,13 @@ export const examRoomApi = baseApi.injectEndpoints({
     deleteExam: builder.mutation<{ message: string }, string | number>({
       query: (id) => ({ url: `/exam-room/exams/${id}`, method: "DELETE" }),
       invalidatesTags: ["EXAMS"],
+    }),
+    deleteExamRoutine: builder.mutation<
+      { message: string; summary: Record<string, unknown> },
+      { semester_id: string; exam_type?: "MIDTERM" | "FINAL"; confirm?: boolean }
+    >({
+      query: (data) => ({ url: "/exam-room/exams/delete-routine", method: "POST", data }),
+      invalidatesTags: ["EXAMS", "ALLOCATIONS"],
     }),
     getRooms: builder.query<RoomEntity[], void | Record<string, unknown>>({
       query: (params) => ({ url: "/exam-room/rooms", method: "GET", params: params ?? undefined }),
@@ -106,6 +115,7 @@ export const {
   useCreateExamMutation,
   useUpdateExamMutation,
   useDeleteExamMutation,
+  useDeleteExamRoutineMutation,
   useGetRoomsQuery,
   useGetRoomCapacityQuery,
   useCreateRoomMutation,

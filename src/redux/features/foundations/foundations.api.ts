@@ -101,8 +101,37 @@ export const foundationsApi = baseApi.injectEndpoints({
       transformResponse: normalizeListResponse,
       providesTags: ["FOUNDATIONS"],
     }),
-    setBatchCourses: builder.mutation<{ message: string; data: FoundationEntity[] }, { batchId: string; course_ids: string[] }>({
-      query: ({ batchId, course_ids }) => ({ url: `/foundations/batches/${batchId}/courses`, method: "PUT", data: { course_ids } }),
+    offerBatchCourse: builder.mutation<
+      { message: string; data: FoundationEntity[] },
+      { batchId: string; course_id: string; semester_id?: string }
+    >({
+      query: ({ batchId, course_id, semester_id }) => ({
+        url: `/foundations/batches/${batchId}/courses`,
+        method: "POST",
+        data: { course_id, semester_id },
+      }),
+      invalidatesTags: ["FOUNDATIONS"],
+    }),
+    unofferBatchCourse: builder.mutation<
+      { message: string; data: FoundationEntity[] },
+      { batchId: string; courseId: string; semester_id?: string }
+    >({
+      query: ({ batchId, courseId, semester_id }) => ({
+        url: `/foundations/batches/${batchId}/courses/${courseId}`,
+        method: "DELETE",
+        params: semester_id ? { semester_id } : undefined,
+      }),
+      invalidatesTags: ["FOUNDATIONS"],
+    }),
+    setBatchCourses: builder.mutation<
+      { message: string; data: FoundationEntity[] },
+      { batchId: string; course_ids: string[]; semester_id?: string }
+    >({
+      query: ({ batchId, course_ids, semester_id }) => ({
+        url: `/foundations/batches/${batchId}/courses`,
+        method: "PUT",
+        data: { course_ids, semester_id },
+      }),
       invalidatesTags: ["FOUNDATIONS"],
     }),
   }),
@@ -130,5 +159,7 @@ export const {
   useUpdateSemesterMutation,
   useDeleteSemesterMutation,
   useGetBatchCoursesQuery,
+  useOfferBatchCourseMutation,
+  useUnofferBatchCourseMutation,
   useSetBatchCoursesMutation,
 } = foundationsApi;

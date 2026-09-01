@@ -3,10 +3,8 @@ import { toast } from "react-toastify";
 import "@/styles/overview.css";
 import { Modal } from "@/components/ui/Modal";
 import { IconEdit, IconTrash } from "@/components/ui/Icons";
-import { DonutChart, HBarList, ChartCard, VIZ } from "@/components/overview/charts";
 import { ConfirmModal } from "@/components/ui/ConfirmModal";
 import { getErrorMessage } from "@/utils/getErrorMessage";
-import { countBy } from "@/utils/stats";
 import {
   useCreateAdminMutation,
   useDeleteAdminMutation,
@@ -84,14 +82,6 @@ export function Users() {
       onLeave: list.length - available,
     };
   }, [allUsers]);
-
-  const roleSlices = useMemo(
-    () =>
-      countBy(Array.isArray(allUsers) ? allUsers : [], (u) => String(u.role ?? "—").toUpperCase() || "—").map(
-        (d, i) => ({ ...d, color: [VIZ.blue, VIZ.orange, VIZ.good, VIZ.warning, VIZ.critical, VIZ.neutral][i % 6] }),
-      ),
-    [allUsers],
-  );
 
   const [createAdmin, { isLoading: creating }] = useCreateAdminMutation();
   const [updateAdmin, { isLoading: updatingAdmin }] = useUpdateAdminMutation();
@@ -253,23 +243,6 @@ export function Users() {
             <div className="foundations__stat-label">On leave</div>
             <div className="foundations__stat-value">{stats.onLeave}</div>
           </div>
-        </div>
-
-        <div
-          style={{ display: "grid", gap: 16, gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", margin: "0 0 16px" }}
-        >
-          <ChartCard title="Users by role" subtitle="System-wide account mix">
-            <DonutChart centerLabel="users" data={roleSlices} />
-          </ChartCard>
-          <ChartCard title="Account status" subtitle="Active vs inactive users">
-            <HBarList
-              data={[
-                { label: "Active", value: stats.active, color: VIZ.good },
-                { label: "Inactive", value: stats.inactive, color: VIZ.critical },
-              ]}
-              unit="users"
-            />
-          </ChartCard>
         </div>
 
         <div className="foundations__toolbar">

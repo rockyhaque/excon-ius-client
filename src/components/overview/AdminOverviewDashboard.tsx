@@ -41,8 +41,8 @@ export function AdminOverviewDashboard() {
   const { data: examsRaw } = useGetExamsQuery({ limit: 100 });
   const { data: roomsRaw, isLoading: roomsLoading } = useGetRoomsQuery({ limit: 100 });
   const { data: leavesRaw, isLoading: leavesLoading } = useGetLeaveHistoryQuery();
-  const { data: deptsRaw, isLoading: deptsLoading } = useGetDepartmentsQuery();
-  const { data: coursesRaw, isLoading: coursesLoading } = useGetCoursesQuery();
+  const { data: deptsRaw, isLoading: deptsLoading } = useGetDepartmentsQuery({ limit: 100 });
+  const { data: coursesRaw, isLoading: coursesLoading } = useGetCoursesQuery({ limit: 1000 });
   const { data: publishedRaw } = useGetPublishedAllocationsQuery();
   const { data: availabilityRaw, isLoading: availLoading } = useFetchAvailabilityQuery();
   const { data: usersRaw } = useGetAllUsersQuery({ limit: 100 }, { skip: !isSuper });

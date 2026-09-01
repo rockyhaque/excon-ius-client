@@ -29,9 +29,9 @@ export function FoundationsManager() {
   const [tab, setTab] = useState<FoundationsTab>("departments");
 
   const { data: deptsRaw = [] } = useGetDepartmentsQuery({ limit: 100 });
-  const { data: batchesRaw = [] } = useGetBatchesQuery({ limit: 100 });
-  const { data: sectionsRaw = [] } = useGetSectionsQuery({ limit: 100 });
-  const { data: coursesRaw = [] } = useGetCoursesQuery({ limit: 100 });
+  const { data: batchesRaw = [] } = useGetBatchesQuery({ limit: 500 });
+  const { data: sectionsRaw = [] } = useGetSectionsQuery({ limit: 500 });
+  const { data: coursesRaw = [] } = useGetCoursesQuery({ limit: 1000 });
   const { data: semestersRaw = [] } = useGetSemestersQuery();
 
   const departments = mapDepartments(deptsRaw);
@@ -54,7 +54,7 @@ export function FoundationsManager() {
           <div>
             <h1 style={{ margin: 0 }}>Foundations</h1>
             <p className="foundations__lead" style={{ marginTop: 6 }}>
-              Manage departments, batches, sections, courses, and semesters.
+              Manage departments, batches 1–20, sections, this semester’s courses, and semesters.
             </p>
           </div>
         </div>

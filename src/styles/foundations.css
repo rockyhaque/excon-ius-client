@@ -262,10 +262,10 @@
   white-space: nowrap;
 }
 
-.foundations__badge--danger {
-  border-color: #fecaca;
-  background: #fef2f2;
-  color: #b91c1c;
+.foundations__badge--ok {
+  border-color: #bbf7d0;
+  background: #f0fdf4;
+  color: #15803d;
 }
 
 .foundations__form {
@@ -293,6 +293,55 @@
   font: inherit;
   background: #fff;
   color: #111827;
+}
+
+.foundations__field input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  padding: 0;
+  border-radius: 4px;
+  accent-color: #5c0931;
+}
+
+.foundations__check-group {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 10px 12px;
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  background: #fafafa;
+}
+
+.foundations__check-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+}
+
+.foundations__check-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.9rem;
+  color: #111827;
+  cursor: pointer;
+}
+
+.foundations__check-dept {
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: #6b7280;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin-bottom: 6px;
+}
+
+.foundations__check-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
 }
 
 .foundations__modal-actions {
@@ -355,6 +404,76 @@
   background: rgba(250, 184, 109, 0.1);
 }
 .curriculum__item input { margin-top: 3px; }
+
+/* Official IUS examination routine (Date / Time / Code / Title / Batch) */
+.ius-routine-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 28px;
+}
+.ius-sheet {
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  padding: 18px 20px 22px;
+}
+.ius-sheet__hdr {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16px;
+}
+.ius-sheet__dept {
+  font-weight: 800;
+  font-size: 0.95rem;
+  color: #111827;
+}
+.ius-sheet__uni {
+  text-align: right;
+  font-weight: 800;
+  font-size: 1rem;
+  color: #5c0931;
+}
+.ius-sheet__uni small {
+  display: block;
+  font-weight: 500;
+  font-size: 0.72rem;
+  color: #6b7280;
+}
+.ius-sheet__title {
+  text-align: center;
+  font-size: 1.15rem;
+  margin: 12px 0 2px;
+  color: #111827;
+}
+.ius-sheet__sem {
+  text-align: center;
+  margin: 0 0 14px;
+  font-size: 0.9rem;
+  color: #374151;
+}
+.ius-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.88rem;
+}
+.ius-table th,
+.ius-table td {
+  border: 1px solid #1f2937;
+  padding: 8px 10px;
+  vertical-align: middle;
+}
+.ius-table th {
+  text-align: center;
+  background: #f3f4f6;
+  font-weight: 700;
+}
+.ius-table__date,
+.ius-table__time {
+  text-align: center;
+  font-weight: 700;
+  white-space: nowrap;
+}
 
 /* Exam routine — per-day date header */
 .routine__date {

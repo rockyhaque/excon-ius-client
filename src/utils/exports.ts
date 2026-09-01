@@ -237,6 +237,273 @@ export function buildHallPacketsHtml(rows: PublishedAllocationRow[], opts: { dep
   return packets || "<p>No published duties to print.</p>";
 }
 
+// ── Official IUS department routine (Date / Time / Code / Title / Batch) ─────
+export type OfficialExamInput = {
+  id?: string;
+  dept?: string | null;
+  course_code?: string | null;
+  course_name?: string | null;
+  batch?: string | null;
+  exam_date?: string | null;
+  start_time?: string | null;
+  end_time?: string | null;
+  exam_type?: string | null;
+  status?: string | null;
+};
+
+export type OfficialSitting = {
+  date: string;
+  start: string;
+  end: string;
+  course_code: string;
+  course_name: string;
+  batches: string;
+  exam_ids: string[];
+};
+
+export type OfficialTableRow = OfficialSitting & {
+  showDate: boolean;
+  dateSpan: number;
+  showTime: boolean;
+  timeSpan: number;
+};
+
+const ordinal = (n: number): string => {
+  const v = n % 100;
+  if (v >= 11 && v <= 13) return `${n}th`;
+  switch (n % 10) {
+    case 1: return `${n}st`;
+    case 2: return `${n}nd`;
+    case 3: return `${n}rd`;
+    default: return `${n}th`;
+  }
+};
+
+/** "10th Batch" / "10th & 11th Batch" / "7th, 8th & 9th Batch" */
+export function formatBatchList(batches: Array<string | number | null | undefined>): string {
+  const nums = [
+    ...new Set(
+      batches
+        .map((b) => Number(String(b ?? "").replace(/[^\d]/g, "")))
+        .filter((n) => Number.isFinite(n) && n > 0),
+    ),
+  ].sort((a, b) => a - b);
+  if (nums.length === 0) {
+    const raw = batches.map((b) => String(b ?? "").trim()).filter(Boolean);
+    return raw.length ? raw.join(", ") : "—";
+  }
+  const labels = nums.map(ordinal);
+  if (labels.length === 1) return `${labels[0]} Batch`;
+  if (labels.length === 2) return `${labels[0]} & ${labels[1]} Batch`;
+  return `${labels.slice(0, -1).join(", ")} & ${labels[labels.length - 1]} Batch`;
+}
+
+export function officialDateLabel(iso: string): string {
+  const raw = String(iso ?? "").slice(0, 10);
+  const dt = new Date(raw + "T00:00:00Z");
+  if (isNaN(dt.getTime())) return raw;
+  const dd = String(dt.getUTCDate()).padStart(2, "0");
+  const mm = String(dt.getUTCMonth() + 1).padStart(2, "0");
+  const day = dt.toLocaleDateString("en-GB", { weekday: "long", timeZone: "UTC" });
+  return `${dd}/${mm}/${dt.getUTCFullYear()} ${day}`;
+}
+
+export function officialExamTitle(examType?: string | null): string {
+  const t = String(examType ?? "").toUpperCase();
+  if (t === "MIDTERM") return "Mid-Term Examination Routine";
+  if (t === "FINAL") return "Final Examination Routine";
+  return "Examination Routine";
+}
+
+/** Collapse section sittings of the same course in the same slot into one row. */
+export function groupOfficialSittings(exams: OfficialExamInput[]): OfficialSitting[] {
+  const map = new Map<string, { row: OfficialSitting; nums: string[] }>();
+  for (const e of exams) {
+    if (String(e.status ?? "").toUpperCase() === "CANCELLED") continue;
+    const date = String(e.exam_date ?? "").slice(0, 10);
+    const start = hhmm(e.start_time);
+    const end = hhmm(e.end_time);
+    const code = String(e.course_code ?? "").trim();
+    if (!date || !code) continue;
+    const key = `${date}|${start}|${end}|${code}`;
+    const existing = map.get(key);
+    const batch = String(e.batch ?? "").trim();
+    if (existing) {
+      if (e.id) existing.row.exam_ids.push(String(e.id));
+      if (batch) existing.nums.push(batch);
+    } else {
+      map.set(key, {
+        nums: batch ? [batch] : [],
+        row: {
+          date,
+          start,
+          end,
+          course_code: code,
+          course_name: String(e.course_name ?? "").trim(),
+          batches: "",
+          exam_ids: e.id ? [String(e.id)] : [],
+        },
+      });
+    }
+  }
+  return [...map.values()]
+    .map(({ row, nums }) => ({ ...row, batches: formatBatchList(nums) }))
+    .sort(
+      (a, b) =>
+        a.date.localeCompare(b.date) ||
+        a.start.localeCompare(b.start) ||
+        a.course_code.localeCompare(b.course_code),
+    );
+}
+
+/** Attach date/time rowspans for the official paper table. */
+export function officialTableRows(exams: OfficialExamInput[]): OfficialTableRow[] {
+  const sittings = groupOfficialSittings(exams);
+  const out: OfficialTableRow[] = [];
+  let i = 0;
+  while (i < sittings.length) {
+    const date = sittings[i]!.date;
+    let dateEnd = i;
+    while (dateEnd < sittings.length && sittings[dateEnd]!.date === date) dateEnd++;
+    const dateSpan = dateEnd - i;
+    let j = i;
+    let dateShown = false;
+    while (j < dateEnd) {
+      const start = sittings[j]!.start;
+      const end = sittings[j]!.end;
+      let timeEnd = j;
+      while (
+        timeEnd < dateEnd &&
+        sittings[timeEnd]!.start === start &&
+        sittings[timeEnd]!.end === end
+      ) {
+        timeEnd++;
+      }
+      const timeSpan = timeEnd - j;
+      let timeShown = false;
+      for (let k = j; k < timeEnd; k++) {
+        const s = sittings[k]!;
+        out.push({
+          ...s,
+          showDate: !dateShown,
+          dateSpan,
+          showTime: !timeShown,
+          timeSpan,
+        });
+        dateShown = true;
+        timeShown = true;
+      }
+      j = timeEnd;
+    }
+    i = dateEnd;
+  }
+  return out;
+}
+
+const coordinatorOf = (dept: string): string => {
+  const d = dept.toLowerCase();
+  if (d.includes("textile")) return "Coordinator, BSc in Textile Program";
+  if (d.includes("mba")) return "Coordinator, MBA Program";
+  if (d.includes("business") || d.includes("bba")) return "Coordinator, BBA Program";
+  return `Coordinator, ${dept}`;
+};
+
+const headOf = (dept: string): string => {
+  const name = dept.replace(/^Department of /i, "");
+  return `Head, Dept. of ${name}`;
+};
+
+const IUS_ROUTINE_STYLES = `
+  * { box-sizing: border-box; }
+  html, body { background: #fff; }
+  body { font-family: "Times New Roman", Times, Georgia, serif; color: #111; padding: 16px 22px; }
+  .sheet { page-break-after: always; }
+  .sheet:last-child { page-break-after: auto; }
+  .hdr { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; }
+  .hdr-left { font-weight: 700; font-size: 14px; }
+  .hdr-right { text-align: right; font-weight: 700; font-size: 15px; color: #5c0931; }
+  .hdr-right small { display: block; font-weight: 400; font-size: 11px; color: #444; }
+  h1.rtitle { text-align: center; font-size: 18px; margin: 10px 0 2px; }
+  .sem { text-align: center; font-size: 14px; margin: 0 0 12px; }
+  table.ius { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+  table.ius th, table.ius td { border: 1px solid #111; padding: 6px 8px; vertical-align: middle; }
+  table.ius th { text-align: center; background: #f4f4f4; font-weight: 700; }
+  table.ius td.date, table.ius td.time { text-align: center; font-weight: 600; white-space: nowrap; }
+  .notes { margin: 12px 0 0; padding-left: 18px; font-size: 12px; }
+  .notes li { margin: 3px 0; }
+  .sign { display: flex; justify-content: space-between; gap: 16px; margin-top: 52px; }
+  .sign .blk { width: 30%; text-align: center; font-size: 12px; }
+  .sign .line { border-top: 1px solid #111; margin-top: 44px; padding-top: 6px; }
+  .addr { text-align: center; font-size: 10.5px; color: #333; margin-top: 28px; border-top: 1px solid #ccc; padding-top: 8px; }
+  @media print { body { padding: 8px 12px; } }
+`;
+
+function officialSheetHtml(
+  dept: string,
+  rows: OfficialTableRow[],
+  semester: string,
+  examType?: string | null,
+): string {
+  const body = rows
+    .map((r) => {
+      const dateTd = r.showDate
+        ? `<td class="date" rowspan="${r.dateSpan}">${escHtml(officialDateLabel(r.date))}</td>`
+        : "";
+      const timeTd = r.showTime
+        ? `<td class="time" rowspan="${r.timeSpan}">${escHtml(timeRange(r.start, r.end))}</td>`
+        : "";
+      return `<tr>${dateTd}${timeTd}<td>${escHtml(r.course_code)}</td><td>${escHtml(r.course_name)}</td><td>${escHtml(r.batches)}</td></tr>`;
+    })
+    .join("");
+  return `<section class="sheet">
+    <div class="hdr">
+      <div class="hdr-left">${escHtml(dept)}</div>
+      <div class="hdr-right">${escHtml(UNIVERSITY)}<small>The International University of Scholars</small></div>
+    </div>
+    <h1 class="rtitle">${escHtml(officialExamTitle(examType))}</h1>
+    <div class="sem">Semester: ${escHtml(semester)}</div>
+    <table class="ius">
+      <thead><tr><th style="width:18%">Date</th><th style="width:16%">Time</th><th style="width:16%">Course Code</th><th>Course Title</th><th style="width:18%">Batch</th></tr></thead>
+      <tbody>${body || `<tr><td colspan="5" style="text-align:center">No exams scheduled.</td></tr>`}</tbody>
+    </table>
+    <ul class="notes">
+      <li>Before appearing in the exam, you have to ensure your course registration. You should collect your admit card.</li>
+      <li>You must bring your admit card to the examination hall.</li>
+      <li>Room numbers will be announced later.</li>
+    </ul>
+    <div class="sign">
+      <div class="blk"><div class="line">${escHtml(coordinatorOf(dept))}</div></div>
+      <div class="blk"><div class="line">${escHtml(headOf(dept))}</div></div>
+      <div class="blk"><div class="line">Controller of Examinations,<br/>University of Scholars</div></div>
+    </div>
+    <div class="addr">The International University of Scholars · Kamal Ataturk Avenue, Banani, Dhaka</div>
+  </section>`;
+}
+
+/** Print the official IUS routine: one sheet per department (or a single department). */
+export function printOfficialRoutine(
+  exams: OfficialExamInput[],
+  opts: { semester: string; examType?: string | null; dept?: string },
+): boolean {
+  const filtered = byDept(exams, opts.dept);
+  const depts = deptsOf(filtered);
+  const pages =
+    depts.length === 0
+      ? "<p>No exams to print.</p>"
+      : depts
+          .map((dept) => officialSheetHtml(dept, officialTableRows(filtered.filter((e) => String(e.dept ?? "") === dept)), opts.semester, opts.examType))
+          .join("");
+  const title = `${UNIVERSITY} — ${officialExamTitle(opts.examType)}`;
+  const html = `<!doctype html><html><head><meta charset="utf-8"/><title>${escHtml(title)}</title>
+    <style>${IUS_ROUTINE_STYLES}</style></head><body>${pages}
+    <script>window.onload=function(){window.print();}</script></body></html>`;
+  const w = window.open("", "_blank");
+  if (!w) return false;
+  w.document.write(html);
+  w.document.close();
+  return true;
+}
+
 // ── CSV exports ─────────────────────────────────────────────────────────────
 export type TimetableExam = {
   course_code?: string | null;

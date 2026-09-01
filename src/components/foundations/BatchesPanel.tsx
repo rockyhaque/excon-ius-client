@@ -10,13 +10,13 @@ import {
   useUpdateBatchMutation,
 } from "@/redux/features/foundations/foundations.api";
 import { mapBatches, mapDepartments } from "@/components/foundations/foundations.types";
-import type { Batch } from "@/types/foundations";
+import type { Batch, BatchStatus } from "@/types/foundations";
 import { IconEdit, IconTrash } from "@/components/ui/Icons";
 import { toast } from "react-toastify";
 
 export function BatchesPanel() {
-  const { data: departmentsRaw = [] } = useGetDepartmentsQuery();
-  const { data: rowsRaw = [], isLoading, error } = useGetBatchesQuery();
+  const { data: departmentsRaw = [] } = useGetDepartmentsQuery({ limit: 100 });
+  const { data: rowsRaw = [], isLoading, error } = useGetBatchesQuery({ limit: 500 });
 
   const deptOptions = useMemo(() => {
     const deps = mapDepartments(departmentsRaw);
@@ -34,6 +34,7 @@ export function BatchesPanel() {
   const [pendingDelete, setPendingDelete] = useState<Batch | null>(null);
   const [deptId, setDeptId] = useState<string>("");
   const [batchNumber, setBatchNumber] = useState("");
+  const [status, setStatus] = useState<BatchStatus>("RUNNING");
   const [formError, setFormError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -44,6 +45,7 @@ export function BatchesPanel() {
     setEditing(null);
     setDeptId(String(deptOptions[0]?.id ?? ""));
     setBatchNumber("");
+    setStatus("RUNNING");
     setFormError(null);
     setOpen(true);
   };
@@ -52,6 +54,7 @@ export function BatchesPanel() {
     setEditing(b);
     setDeptId(String(b.dept_id));
     setBatchNumber(String(b.number ?? b.name ?? ""));
+    setStatus(b.status === "COMPLETED" ? "COMPLETED" : "RUNNING");
     setFormError(null);
     setOpen(true);
   };
@@ -64,7 +67,7 @@ export function BatchesPanel() {
       return;
     }
     try {
-      const payload = { dept_id: deptId, number: n };
+      const payload = { dept_id: deptId, number: n, status };
       if (editing) await updateBatch({ id: editing.id, data: payload }).unwrap();
       else await createBatch(payload).unwrap();
       setOpen(false);
@@ -112,13 +115,14 @@ export function BatchesPanel() {
             <tr>
               <th>Department</th>
               <th>Batch</th>
+              <th>Status</th>
               <th style={{ width: 160 }}>Actions</th>
             </tr>
           </thead>
           <tbody>
             {rows.length === 0 ? (
               <tr>
-                <td colSpan={3} className="foundations__empty">
+                <td colSpan={4} className="foundations__empty">
                   No batches yet.
                 </td>
               </tr>
@@ -128,6 +132,13 @@ export function BatchesPanel() {
                   <td>{b.dept_name || "—"}</td>
                   <td>
                     <strong>{b.name}</strong>
+                  </td>
+                  <td>
+                    {b.status === "COMPLETED" ? (
+                      <span className="foundations__badge">Completed</span>
+                    ) : (
+                      <span className="foundations__badge foundations__badge--ok">Running</span>
+                    )}
                   </td>
                   <td>
                     <div className="foundations__actions">
@@ -184,10 +195,17 @@ export function BatchesPanel() {
               type="number"
               value={batchNumber}
               onChange={(e) => setBatchNumber(e.target.value)}
-              placeholder="e.g. 10"
+              placeholder="e.g. 12"
               min={1}
               step={1}
             />
+          </label>
+          <label className="foundations__field">
+            <span>Status</span>
+            <select value={status} onChange={(e) => setStatus(e.target.value as BatchStatus)}>
+              <option value="RUNNING">Running</option>
+              <option value="COMPLETED">Completed</option>
+            </select>
           </label>
           {formError ? <div className="foundations__error">{formError}</div> : null}
         </div>

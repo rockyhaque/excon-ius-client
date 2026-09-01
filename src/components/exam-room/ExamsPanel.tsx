@@ -40,9 +40,13 @@ export function ExamsPanel() {
   const deptsCovered = useMemo(() => new Set(rows.map((e) => e.dept).filter(Boolean)).size, [rows]);
 
   const { data: depsRaw = [] } = useGetDepartmentsQuery({ limit: 100 });
-  const { data: batchesRaw = [] } = useGetBatchesQuery({ limit: 100 });
-  const { data: sectionsRaw = [] } = useGetSectionsQuery({ limit: 100 });
-  const { data: coursesRaw = [] } = useGetCoursesQuery({ limit: 100 });
+  const { data: batchesRaw = [] } = useGetBatchesQuery({ limit: 500 });
+  const { data: sectionsRaw = [] } = useGetSectionsQuery({ limit: 500 });
+  const [deptId, setDeptId] = useState<string>("");
+  const { data: coursesRaw = [] } = useGetCoursesQuery(
+    { limit: 500, dept_id: deptId },
+    { skip: !deptId },
+  );
 
   const deps = useMemo(() => mapDepartments(depsRaw), [depsRaw]);
   const batches = useMemo(() => mapBatches(batchesRaw), [batchesRaw]);
@@ -60,7 +64,6 @@ export function ExamsPanel() {
 
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<Exam | null>(null);
-  const [deptId, setDeptId] = useState<string>("");
   const [batchId, setBatchId] = useState<string>("");
   const [sectionId, setSectionId] = useState<string>("");
   const [courseId, setCourseId] = useState<string>("");

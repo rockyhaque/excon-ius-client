@@ -3,17 +3,18 @@ import { toast } from "react-toastify";
 import "@/styles/overview.css";
 import { Modal } from "@/components/ui/Modal";
 import { ConfirmModal } from "@/components/ui/ConfirmModal";
-import { IconEdit, IconTrash } from "@/components/ui/Icons";
 import { getErrorMessage } from "@/utils/getErrorMessage";
-import { useGetSemestersQuery, useGetDepartmentsQuery } from "@/redux/features/foundations/foundations.api";
+import { useGetSemestersQuery, useGetDepartmentsQuery, useGetBatchesQuery } from "@/redux/features/foundations/foundations.api";
+import { batchOptionLabel, mapBatches } from "@/components/foundations/foundations.types";
 import {
   useGetExamsQuery,
   useGetRoomsQuery,
   useGenerateExamRoutineMutation,
   useUpdateExamMutation,
   useDeleteExamMutation,
+  useDeleteExamRoutineMutation,
 } from "@/redux/features/exam-room/examRoom.api";
-import { deptsOf, downloadCsv, stampName, timetableCsv } from "@/utils/exports";
+import { deptsOf, downloadCsv, officialDateLabel, officialExamTitle, officialTableRows, printOfficialRoutine, stampName, timetableCsv } from "@/utils/exports";
 
 const s = (v: unknown) => (v == null ? "" : String(v));
 const arr = (x: unknown): Record<string, unknown>[] => {
@@ -21,18 +22,12 @@ const arr = (x: unknown): Record<string, unknown>[] => {
   const d = (x as { data?: unknown } | undefined)?.data;
   return Array.isArray(d) ? (d as Record<string, unknown>[]) : [];
 };
-const fmtDay = (iso: string) => {
-  const d = new Date(iso);
-  return isNaN(d.getTime()) ? iso : d.toLocaleDateString(undefined, { weekday: "long", year: "numeric", month: "short", day: "numeric" });
-};
-const fmtTime = (v: string) => (v ? v.slice(0, 5) : "—");
 const fmtBoardDay = (iso: string) => {
   const dt = new Date(iso + "T00:00:00Z");
   return isNaN(dt.getTime())
     ? iso
     : dt.toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric", timeZone: "UTC" });
 };
-const esc = (v: unknown) => s(v).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c] as string));
 
 type ExamType = "MIDTERM" | "FINAL";
 type ExamRow = {
@@ -176,11 +171,14 @@ export function ExamRoutinePanel() {
     [semRaw],
   );
 
-  const { data: deptRaw } = useGetDepartmentsQuery();
+  const { data: deptRaw } = useGetDepartmentsQuery({ limit: 100 });
   const genDepartments = useMemo(
     () => arr(deptRaw).map((x) => ({ id: s(x.id), name: s(x.name) })).filter((d) => d.id && d.name),
     [deptRaw],
   );
+
+  const { data: batchesRaw } = useGetBatchesQuery({ limit: 500 });
+  const allBatches = useMemo(() => mapBatches(batchesRaw), [batchesRaw]);
 
   const [semesterId, setSemesterId] = useState("");
   const [viewType, setViewType] = useState<ExamType | "">("");
@@ -230,6 +228,16 @@ export function ExamRoutinePanel() {
     [rows, deptFilter],
   );
 
+  const officialSheets = useMemo(() => {
+    const names = deptFilter ? [deptFilter] : deptsOf(viewRows);
+    return names
+      .map((dept) => ({
+        dept,
+        rows: officialTableRows(viewRows.filter((r) => r.dept === dept)),
+      }))
+      .filter((s) => s.rows.length > 0);
+  }, [viewRows, deptFilter]);
+
   const groups = useMemo(() => {
     const m = new Map<string, ExamRow[]>();
     viewRows.forEach((r) => {
@@ -267,11 +275,13 @@ export function ExamRoutinePanel() {
   const [generate, { isLoading: generating }] = useGenerateExamRoutineMutation();
   const [updateExam, { isLoading: saving }] = useUpdateExamMutation();
   const [deleteExam, { isLoading: deleting }] = useDeleteExamMutation();
+  const [deleteRoutine, { isLoading: deletingRoutine }] = useDeleteExamRoutineMutation();
 
   const [genOpen, setGenOpen] = useState(false);
   const [genSem, setGenSem] = useState("");
   const [examType, setExamType] = useState<ExamType>("MIDTERM");
   const [genDept, setGenDept] = useState(""); // "" = all departments
+  const [selectedBatchIds, setSelectedBatchIds] = useState<Set<string>>(new Set());
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
   const [slots, setSlots] = useState<{ start: string; end: string }[]>([{ start: "09:00", end: "12:00" }]);
@@ -284,6 +294,34 @@ export function ExamRoutinePanel() {
   const [skipWeekends, setSkipWeekends] = useState(true);
   const [replace, setReplace] = useState(false);
   const [genError, setGenError] = useState<string | null>(null);
+
+  const genBatches = useMemo(
+    () => {
+      const list = genDept ? allBatches.filter((b) => String(b.dept_id) === genDept) : allBatches;
+      return [...list].sort((a, b) => (a.number ?? 0) - (b.number ?? 0) || String(a.dept_name).localeCompare(String(b.dept_name)));
+    },
+    [allBatches, genDept],
+  );
+  const runningBatches = useMemo(
+    () => genBatches.filter((b) => b.status !== "COMPLETED"),
+    [genBatches],
+  );
+  const genBatchIdsKey = runningBatches.map((b) => String(b.id)).join(",");
+
+  useEffect(() => {
+    setSelectedBatchIds(new Set(genBatchIdsKey ? genBatchIdsKey.split(",") : []));
+  }, [genDept, genBatchIdsKey]);
+
+  const toggleBatch = (id: string) => {
+    setSelectedBatchIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+  const setAllBatches = (on: boolean) =>
+    setSelectedBatchIds(on ? new Set(runningBatches.map((b) => String(b.id))) : new Set());
 
   const openGenerate = () => {
     setGenSem(semesterId || semesters[0]?.id || "");
@@ -301,6 +339,12 @@ export function ExamRoutinePanel() {
 
   const submitGenerate = async () => {
     setGenError(null);
+    if (genBatches.length === 0) {
+      return setGenError("No batches found. Create them in Foundations → Batches first.");
+    }
+    if (selectedBatchIds.size === 0) {
+      return setGenError("Select at least one batch.");
+    }
     if (!startDate || !endDate) return setGenError("Date range is required.");
     if (endDate < startDate) return setGenError("End date must be on or after start date.");
     if (!Number.isFinite(studentsPerSection) || studentsPerSection < 1) {
@@ -338,6 +382,7 @@ export function ExamRoutinePanel() {
           replace,
           ...(confirmReplace ? { confirm_replace: true } : {}),
           ...(genDept ? { dept_id: genDept } : {}),
+          batch_ids: [...selectedBatchIds],
           students_per_section: studentsPerSection,
         }).unwrap();
 
@@ -440,55 +485,37 @@ export function ExamRoutinePanel() {
     }
   };
 
+  const [pendingDeleteRoutine, setPendingDeleteRoutine] = useState(false);
+
+  const routineDeleteLabel = viewType
+    ? `${viewType === "MIDTERM" ? "Midterm" : "Final"} routine`
+    : "full exam routine";
+  const routineSemesterName = semesters.find((x) => x.id === semesterId)?.name || "this semester";
+
+  const confirmDeleteRoutine = async () => {
+    if (!semesterId) return;
+    try {
+      const res = await deleteRoutine({
+        semester_id: semesterId,
+        ...(viewType ? { exam_type: viewType } : {}),
+        confirm: true,
+      }).unwrap();
+      setPendingDeleteRoutine(false);
+      toast.success(res.message ?? "Routine deleted.");
+    } catch (e: unknown) {
+      toast.error(getErrorMessage(e, "Could not delete the routine."));
+    }
+  };
+
   const exportPdf = () => {
+    if (viewRows.length === 0) return toast.error("No exams to export.");
     const sem = semesters.find((x) => x.id === semesterId);
-    const heading = `${sem ? esc(sem.name) : "Exam Routine"}${viewType ? ` · ${viewType}` : ""}`;
-    const body = groups
-      .map(([date, list]) => {
-        const trs = list
-          .map(
-            (r) => `<tr>
-              <td>${fmtTime(r.start_time)}–${fmtTime(r.end_time)}</td>
-              <td>${esc(r.dept)}</td>
-              <td>B${esc(r.batch)}${r.section ? "-" + esc(r.section) : ""}</td>
-              <td><strong>${esc(r.course_code)}</strong> ${esc(r.course_name)}</td>
-              <td>${esc(r.room_name || "—")}${r.room_building ? " (" + esc(r.room_building) + ")" : ""}</td>
-              <td>${esc(r.exam_type || "—")}</td>
-              <td>${esc(r.status)}</td>
-            </tr>`,
-          )
-          .join("");
-        return `<section><h2>${esc(fmtDay(date))}</h2>
-          <table><thead><tr><th>Time</th><th>Department</th><th>Batch</th><th>Course</th><th>Room</th><th>Type</th><th>Status</th></tr></thead>
-          <tbody>${trs}</tbody></table></section>`;
-      })
-      .join("");
-
-    const html = `<!doctype html><html><head><meta charset="utf-8"/><title>${heading} — Exam Routine</title>
-      <style>
-        * { box-sizing: border-box; }
-        html, body { background: #fff; }
-        body { font-family: system-ui, -apple-system, "Segoe UI", sans-serif; color: #111827; padding: 28px; }
-        h1 { margin: 0 0 2px; font-size: 20px; }
-        .meta { color: #6b7280; font-size: 12px; margin-bottom: 18px; }
-        section { margin-bottom: 16px; page-break-inside: avoid; }
-        h2 { font-size: 13px; margin: 0 0 6px; padding: 6px 10px; background: #f3f4f6; border-radius: 6px; }
-        table { width: 100%; border-collapse: collapse; font-size: 12px; }
-        th, td { text-align: left; padding: 6px 10px; border-bottom: 1px solid #e5e7eb; }
-        th { background: #fafafa; font-weight: 700; }
-        @media print { body { padding: 0; } }
-      </style></head>
-      <body>
-        <h1>University of Scholars — Exam Routine</h1>
-        <div class="meta">${heading}${deptFilter ? " · " + esc(deptFilter) : ""} · ${viewRows.length} exam(s) · Generated ${esc(new Date().toLocaleDateString())}</div>
-        ${body || "<p>No exams to print.</p>"}
-        <script>window.onload = function(){ window.print(); }</script>
-      </body></html>`;
-
-    const w = window.open("", "_blank");
-    if (!w) return toast.error("Pop-up blocked — allow pop-ups to export the PDF.");
-    w.document.write(html);
-    w.document.close();
+    const ok = printOfficialRoutine(viewRows, {
+      semester: sem?.name || "—",
+      examType: viewType || viewRows[0]?.exam_type,
+      ...(deptFilter ? { dept: deptFilter } : {}),
+    });
+    if (!ok) return toast.error("Pop-up blocked — allow pop-ups to export the PDF.");
   };
 
   const exportCsv = () => {
@@ -536,7 +563,7 @@ export function ExamRoutinePanel() {
               aria-pressed={routineView === "list"}
               onClick={() => setRoutineView("list")}
             >
-              List
+              Official
             </button>
             <button
               type="button"
@@ -587,13 +614,21 @@ export function ExamRoutinePanel() {
             ))}
           </select>
           <button className="foundations__btn foundations__btn--ghost" type="button" onClick={exportPdf} disabled={viewRows.length === 0}>
-            Export PDF
+            {deptFilter ? "Export this department" : "Export PDF (all departments)"}
           </button>
           <button className="foundations__btn foundations__btn--ghost" type="button" onClick={exportCsv} disabled={viewRows.length === 0}>
             Export CSV
           </button>
           <button className="foundations__btn" type="button" onClick={openGenerate} disabled={generating}>
             {generating ? "Generating…" : "Generate routine"}
+          </button>
+          <button
+            className="foundations__btn foundations__btn--danger"
+            type="button"
+            onClick={() => setPendingDeleteRoutine(true)}
+            disabled={deletingRoutine || rows.length === 0}
+          >
+            {deletingRoutine ? "Deleting…" : "Delete routine"}
           </button>
         </div>
       </div>
@@ -640,92 +675,58 @@ export function ExamRoutinePanel() {
           {routineView === "board" ? (
             <RoutineBoard rows={viewRows} onMove={handleMove} moving={saving} />
           ) : (
-            groups.map(([date, list]) => (
-            <div key={date} style={{ marginBottom: 14 }}>
-              <div className="routine__date" style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10 }}>
-                <span>{fmtDay(date)}</span>
-                <span className="foundations__badge">
-                  {list.length} exam{list.length === 1 ? "" : "s"}
-                </span>
-              </div>
-              <div className="foundations__table-wrap">
-                <table className="foundations__table">
-                  <thead>
-                    <tr>
-                      <th style={{ width: 110 }}>Time</th>
-                      <th style={{ width: 90 }}>Type</th>
-                      <th>Department</th>
-                      <th style={{ width: 90 }}>Batch</th>
-                      <th>Course</th>
-                      <th>Room</th>
-                      <th style={{ width: 70 }}>Students</th>
-                      <th style={{ width: 110 }}>Status</th>
-                      <th style={{ width: 100 }}>Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {list.map((r) => (
-                      <tr key={r.id}>
-                        <td>
-                          {fmtTime(r.start_time)}–{fmtTime(r.end_time)}
-                        </td>
-                        <td>{r.exam_type || "—"}</td>
-                        <td>{r.dept || "—"}</td>
-                        <td>
-                          B{r.batch}
-                          {r.section ? `-${r.section}` : ""}
-                        </td>
-                        <td>
-                          <strong>{r.course_code}</strong>{" "}
-                          <span className="foundations__muted" style={{ margin: 0 }}>
-                            {r.course_name}
-                          </span>
-                        </td>
-                        <td>
-                          {r.room_name ? (
-                            <>
-                              <strong>{r.room_name}</strong>
-                              {r.room_building ? (
-                                <span className="foundations__muted" style={{ margin: 0 }}>
-                                  {" "}
-                                  · {r.room_building}
-                                  {r.room_capacity != null ? ` (${r.room_capacity})` : ""}
-                                </span>
+            <div className="ius-routine-stack">
+              {officialSheets.map((sheet) => {
+                const sem = semesters.find((x) => x.id === semesterId);
+                return (
+                  <article key={sheet.dept} className="ius-sheet">
+                    <header className="ius-sheet__hdr">
+                      <div className="ius-sheet__dept">{sheet.dept}</div>
+                      <div className="ius-sheet__uni">
+                        University of Scholars
+                        <small>The International University of Scholars</small>
+                      </div>
+                    </header>
+                    <h3 className="ius-sheet__title">
+                      {officialExamTitle(viewType || viewRows[0]?.exam_type)}
+                    </h3>
+                    <p className="ius-sheet__sem">Semester: {sem?.name || "—"}</p>
+                    <div className="foundations__table-wrap">
+                      <table className="ius-table">
+                        <thead>
+                          <tr>
+                            <th style={{ width: "18%" }}>Date</th>
+                            <th style={{ width: "16%" }}>Time</th>
+                            <th style={{ width: "16%" }}>Course Code</th>
+                            <th>Course Title</th>
+                            <th style={{ width: "18%" }}>Batch</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {sheet.rows.map((r) => (
+                            <tr key={`${r.date}-${r.start}-${r.course_code}`}>
+                              {r.showDate ? (
+                                <td className="ius-table__date" rowSpan={r.dateSpan}>
+                                  {officialDateLabel(r.date)}
+                                </td>
                               ) : null}
-                            </>
-                          ) : (
-                            <span className="foundations__muted">Unassigned</span>
-                          )}
-                        </td>
-                        <td>{r.expected_students ?? "—"}</td>
-                        <td>
-                          <span className={`foundations__badge ${r.status === "CANCELLED" ? "foundations__badge--danger" : ""}`}>
-                            {r.status || "—"}
-                          </span>
-                        </td>
-                        <td>
-                          <div className="foundations__actions">
-                            <button type="button" className="foundations__icon-btn" onClick={() => openEdit(r)} aria-label="Edit">
-                              <IconEdit />
-                            </button>
-                            <button
-                              type="button"
-                              className="foundations__icon-btn foundations__icon-btn--danger"
-                              disabled={deleting}
-                              onClick={() => setPendingDelete(r)}
-                              aria-label="Delete"
-                            >
-                              <IconTrash />
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+                              {r.showTime ? (
+                                <td className="ius-table__time" rowSpan={r.timeSpan}>
+                                  {r.start}–{r.end}
+                                </td>
+                              ) : null}
+                              <td>{r.course_code}</td>
+                              <td>{r.course_name}</td>
+                              <td>{r.batches}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </article>
+                );
+              })}
             </div>
-            ))
           )}
         </>
       ) : null}
@@ -733,7 +734,7 @@ export function ExamRoutinePanel() {
       <Modal
         open={genOpen}
         title="Generate exam routine"
-        width={560}
+        width={600}
         onClose={() => setGenOpen(false)}
         footer={
           <div className="foundations__modal-actions">
@@ -783,6 +784,71 @@ export function ExamRoutinePanel() {
               ))}
             </select>
           </label>
+
+          <div className="foundations__field">
+            <span>Batches</span>
+            {genBatches.length === 0 ? (
+              <p className="foundations__muted" style={{ margin: 0 }}>
+                No batches yet — create them in <strong>Foundations → Batches</strong>.
+              </p>
+            ) : (
+              <div className="foundations__check-group">
+                {genDept || genDepartments.length === 0 ? (
+                  <div className="foundations__check-grid">
+                    {genBatches.map((b) => {
+                      const id = String(b.id);
+                      return (
+                        <label key={id} className="foundations__check-item">
+                          <input
+                            type="checkbox"
+                            checked={selectedBatchIds.has(id)}
+                            onChange={() => toggleBatch(id)}
+                          />
+                          <span>{batchOptionLabel(b)}</span>
+                        </label>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  genDepartments.map((d) => {
+                    const list = genBatches.filter((b) => String(b.dept_id) === d.id);
+                    if (list.length === 0) return null;
+                    return (
+                      <div key={d.id}>
+                        <div className="foundations__check-dept">{d.name}</div>
+                        <div className="foundations__check-grid">
+                          {list.map((b) => {
+                            const id = String(b.id);
+                            return (
+                              <label key={id} className="foundations__check-item">
+                                <input
+                                  type="checkbox"
+                                  checked={selectedBatchIds.has(id)}
+                                  onChange={() => toggleBatch(id)}
+                                />
+                                <span>{batchOptionLabel(b)}</span>
+                              </label>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    );
+                  })
+                )}
+                <div className="foundations__check-actions">
+                  <button type="button" className="foundations__btn foundations__btn--ghost" style={{ padding: "4px 10px" }} onClick={() => setAllBatches(true)}>
+                    Select running
+                  </button>
+                  <button type="button" className="foundations__btn foundations__btn--ghost" style={{ padding: "4px 10px" }} onClick={() => setAllBatches(false)}>
+                    Clear
+                  </button>
+                  <span className="foundations__muted" style={{ margin: 0 }}>
+                    {selectedBatchIds.size} selected · completed batches are listed but not auto-selected
+                  </span>
+                </div>
+              </div>
+            )}
+          </div>
 
           <label className="foundations__field">
             <span>Start date</span>
@@ -848,7 +914,7 @@ export function ExamRoutinePanel() {
           <label style={{ display: "flex", alignItems: "center", gap: 10 }}>
             <input type="checkbox" checked={replace} onChange={(e) => setReplace(e.target.checked)} />
             <span className="foundations__muted" style={{ margin: 0 }}>
-              Replace existing {examType} exams {genDept ? "for the selected department" : "for this semester"}
+              Replace existing {examType} exams for the selected {selectedBatchIds.size === 1 ? "batch" : "batches"}
             </span>
           </label>
 
@@ -937,6 +1003,15 @@ export function ExamRoutinePanel() {
         busy={deleting}
         onClose={() => setPendingDelete(null)}
         onConfirm={() => void confirmDelete()}
+      />
+      <ConfirmModal
+        open={pendingDeleteRoutine}
+        title="Delete routine"
+        message={`Delete the ${routineDeleteLabel} for ${routineSemesterName}? This will remove ${rows.length} exam(s) and any assigned invigilation duties. This cannot be undone.`}
+        confirmLabel="Delete routine"
+        busy={deletingRoutine}
+        onClose={() => setPendingDeleteRoutine(false)}
+        onConfirm={() => void confirmDeleteRoutine()}
       />
     </>
   );

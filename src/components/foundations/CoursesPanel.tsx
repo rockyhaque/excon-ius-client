@@ -9,18 +9,26 @@ import {
   useGetBatchesQuery,
   useGetCoursesQuery,
   useGetDepartmentsQuery,
-  useSetBatchCoursesMutation,
+  useGetSemestersQuery,
+  useOfferBatchCourseMutation,
+  useUnofferBatchCourseMutation,
   useUpdateCourseMutation,
 } from "@/redux/features/foundations/foundations.api";
-import { mapBatches, mapCourses, mapDepartments } from "@/components/foundations/foundations.types";
-import type { Course } from "@/types/foundations";
+import { batchOptionLabel, mapBatches, mapCourses, mapDepartments } from "@/components/foundations/foundations.types";
+import type { Course, CourseKind } from "@/types/foundations";
+import { MAX_SEMESTER_CREDITS } from "@/types/foundations";
 import { IconEdit, IconTrash } from "@/components/ui/Icons";
 import { toast } from "react-toastify";
 
 export function CoursesPanel() {
   const { data: departmentsRaw = [] } = useGetDepartmentsQuery({ limit: 100 });
-  const { data: batchesRaw = [] } = useGetBatchesQuery({ limit: 100 });
-  const { data: rowsRaw = [], isLoading, error } = useGetCoursesQuery({ limit: 100 });
+  const { data: batchesRaw = [] } = useGetBatchesQuery({ limit: 500 });
+  const { data: semestersRaw = [] } = useGetSemestersQuery();
+  const [filterDeptId, setFilterDeptId] = useState("");
+  const { data: catalogRaw = [], isLoading: loadingCatalog } = useGetCoursesQuery(
+    { limit: 500, dept_id: filterDeptId },
+    { skip: !filterDeptId },
+  );
 
   const deptOptions = useMemo(() => {
     const deps = mapDepartments(departmentsRaw);
@@ -28,10 +36,16 @@ export function CoursesPanel() {
   }, [departmentsRaw]);
 
   const batches = useMemo(() => mapBatches(batchesRaw), [batchesRaw]);
-  const allCourses = useMemo(() => mapCourses(rowsRaw), [rowsRaw]);
+  const catalog = useMemo(() => mapCourses(catalogRaw), [catalogRaw]);
 
-  // Filters (from Curriculum)
-  const [filterDeptId, setFilterDeptId] = useState("");
+  const currentSemester = useMemo(() => {
+    const rows = Array.isArray(semestersRaw) ? semestersRaw : [];
+    const current = rows.find((s) => Boolean((s as { is_current?: unknown }).is_current));
+    const pick = current ?? rows[0];
+    if (!pick) return null;
+    return { id: String(pick.id ?? ""), name: String(pick.name ?? "Current semester") };
+  }, [semestersRaw]);
+
   const [filterBatchId, setFilterBatchId] = useState("");
 
   useEffect(() => {
@@ -39,7 +53,10 @@ export function CoursesPanel() {
   }, [deptOptions, filterDeptId]);
 
   const deptBatches = useMemo(
-    () => batches.filter((b) => !filterDeptId || String(b.dept_id) === filterDeptId),
+    () =>
+      batches
+        .filter((b) => !filterDeptId || String(b.dept_id) === filterDeptId)
+        .sort((a, b) => (a.number ?? 0) - (b.number ?? 0)),
     [batches, filterDeptId],
   );
 
@@ -49,75 +66,76 @@ export function CoursesPanel() {
       return;
     }
     if (!deptBatches.some((b) => String(b.id) === filterBatchId)) {
-      setFilterBatchId(String(deptBatches[0]!.id));
+      const running = deptBatches.find((b) => b.status !== "COMPLETED");
+      setFilterBatchId(String((running ?? deptBatches[0]!).id));
     }
   }, [deptBatches, filterBatchId]);
 
-  const filteredRows = useMemo(
-    () => allCourses.filter((c) => !filterDeptId || String(c.dept_id) === filterDeptId),
-    [allCourses, filterDeptId],
-  );
-
-  // Curriculum selection for the filtered batch
-  const { data: currRaw, isFetching: loadingCurr } = useGetBatchCoursesQuery(filterBatchId, {
+  const { data: offeredRaw, isFetching: loadingOffered } = useGetBatchCoursesQuery(filterBatchId, {
     skip: !filterBatchId,
   });
-  const currIds = useMemo(
-    () => new Set(((currRaw ?? []) as { id?: unknown }[]).map((c) => String(c.id))),
-    [currRaw],
-  );
-  const [selected, setSelected] = useState<Set<string>>(new Set());
-  useEffect(() => {
-    setSelected(new Set(currIds));
-  }, [currIds, filterBatchId]);
+  const offered = useMemo(() => mapCourses(offeredRaw ?? []), [offeredRaw]);
+  const offeredIds = useMemo(() => new Set(offered.map((c) => String(c.id))), [offered]);
+  const creditsUsed = useMemo(() => offered.reduce((sum, c) => sum + (c.credit || 0), 0), [offered]);
 
-  const [saveCurriculum, { isLoading: savingCurr }] = useSetBatchCoursesMutation();
-
-  const toggleCurr = (id: string) => {
-    setSelected((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
-  };
-  const setAllCurr = (on: boolean) =>
-    setSelected(on ? new Set(filteredRows.map((c) => String(c.id))) : new Set());
-
-  const dirty = useMemo(() => {
-    if (selected.size !== currIds.size) return true;
-    for (const id of selected) if (!currIds.has(id)) return true;
-    return false;
-  }, [selected, currIds]);
-
-  const onSaveCurriculum = async () => {
-    if (!filterBatchId) return;
-    try {
-      await saveCurriculum({ batchId: filterBatchId, course_ids: [...selected] }).unwrap();
-      toast.success("Curriculum saved.");
-    } catch (e: unknown) {
-      toast.error(getErrorMessage(e, "Could not save curriculum."));
-    }
-  };
-
-  // Course CRUD
   const [createCourse, { isLoading: creating }] = useCreateCourseMutation();
   const [updateCourse, { isLoading: updating }] = useUpdateCourseMutation();
   const [deleteCourse, { isLoading: deleting }] = useDeleteCourseMutation();
+  const [offerCourse, { isLoading: offering }] = useOfferBatchCourseMutation();
+  const [unofferCourse, { isLoading: unoffering }] = useUnofferBatchCourseMutation();
 
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<Course | null>(null);
   const [pendingDelete, setPendingDelete] = useState<Course | null>(null);
+  const [pendingUnoffer, setPendingUnoffer] = useState<Course | null>(null);
   const [formDeptId, setFormDeptId] = useState("");
+  const [formBatchId, setFormBatchId] = useState("");
+  const [formCourseId, setFormCourseId] = useState("");
+  const [createNew, setCreateNew] = useState(false);
   const [name, setName] = useState("");
   const [code, setCode] = useState("");
+  const [kind, setKind] = useState<CourseKind>("THEORY");
   const [formError, setFormError] = useState<string | null>(null);
+
+  const formBatches = useMemo(
+    () =>
+      batches
+        .filter((b) => String(b.dept_id) === formDeptId)
+        .sort((a, b) => (a.number ?? 0) - (b.number ?? 0)),
+    [batches, formDeptId],
+  );
+
+  const { data: formOfferedRaw } = useGetBatchCoursesQuery(formBatchId, { skip: !formBatchId || !open || Boolean(editing) });
+  const formOffered = useMemo(() => mapCourses(formOfferedRaw ?? []), [formOfferedRaw]);
+  const formCreditsUsed = useMemo(
+    () => (formBatchId === filterBatchId ? creditsUsed : formOffered.reduce((sum, c) => sum + (c.credit || 0), 0)),
+    [formBatchId, filterBatchId, creditsUsed, formOffered],
+  );
+  const formOfferedIds = useMemo(() => {
+    if (formBatchId && formBatchId === filterBatchId) return offeredIds;
+    return new Set(formOffered.map((c) => String(c.id)));
+  }, [formBatchId, filterBatchId, offeredIds, formOffered]);
+
+  const pickerCourses = useMemo(
+    () => catalog.filter((c) => String(c.dept_id) === formDeptId && !formOfferedIds.has(String(c.id))),
+    [catalog, formDeptId, formOfferedIds],
+  );
+
+  const selectedPicker = pickerCourses.find((c) => String(c.id) === formCourseId);
+  const addCredit = createNew || editing ? (kind === "LAB" ? 1 : 3) : selectedPicker?.credit || 0;
+  const remaining = MAX_SEMESTER_CREDITS - formCreditsUsed;
+  const wouldExceed = !editing && addCredit > remaining;
 
   const openCreate = () => {
     setEditing(null);
-    setFormDeptId(filterDeptId || deptOptions[0]?.id || "");
+    const dept = filterDeptId || deptOptions[0]?.id || "";
+    setFormDeptId(dept);
+    setFormBatchId(filterBatchId);
+    setFormCourseId("");
+    setCreateNew(false);
     setName("");
     setCode("");
+    setKind("THEORY");
     setFormError(null);
     setOpen(true);
   };
@@ -125,26 +143,80 @@ export function CoursesPanel() {
   const openEdit = (c: Course) => {
     setEditing(c);
     setFormDeptId(String(c.dept_id));
+    setFormBatchId(filterBatchId);
+    setFormCourseId("");
+    setCreateNew(false);
     setName(c.name);
     setCode(c.code);
+    setKind(c.kind === "LAB" ? "LAB" : "THEORY");
     setFormError(null);
     setOpen(true);
   };
 
   const submit = async () => {
     setFormError(null);
-    if (!formDeptId || !name.trim() || !code.trim()) {
-      setFormError("Department, course name and code are required.");
+    if (editing) {
+      if (!formDeptId || !name.trim() || !code.trim()) {
+        setFormError("Department, course name and code are required.");
+        return;
+      }
+      try {
+        await updateCourse({
+          id: editing.id,
+          data: { dept_id: formDeptId, name: name.trim(), code: code.trim(), kind },
+        }).unwrap();
+        setOpen(false);
+        toast.success("Course updated.");
+      } catch (e: unknown) {
+        const msg = getErrorMessage(e, "Could not save course.");
+        setFormError(msg);
+        toast.error(msg);
+      }
       return;
     }
+
+    if (!formDeptId || !formBatchId) {
+      setFormError("Department and batch are required.");
+      return;
+    }
+    if (!currentSemester?.id) {
+      setFormError("Set a current semester in Foundations → Semesters first.");
+      return;
+    }
+    if (wouldExceed) {
+      setFormError(`This batch already has ${formCreditsUsed} credits. A student may take at most ${MAX_SEMESTER_CREDITS} credits per semester.`);
+      return;
+    }
+
     try {
-      const payload = { dept_id: formDeptId, name: name.trim(), code: code.trim() };
-      if (editing) await updateCourse({ id: editing.id, data: payload }).unwrap();
-      else await createCourse(payload).unwrap();
+      if (createNew) {
+        if (!name.trim() || !code.trim()) {
+          setFormError("Course name and code are required.");
+          return;
+        }
+        await createCourse({
+          dept_id: formDeptId,
+          name: name.trim(),
+          code: code.trim(),
+          kind,
+          batch_id: formBatchId,
+          semester_id: currentSemester.id,
+        }).unwrap();
+      } else {
+        if (!formCourseId) {
+          setFormError("Pick a course, or create a new one.");
+          return;
+        }
+        await offerCourse({
+          batchId: formBatchId,
+          course_id: formCourseId,
+          semester_id: currentSemester.id,
+        }).unwrap();
+      }
       setOpen(false);
-      toast.success(editing ? "Course updated." : "Course created.");
+      toast.success("Course added for this semester.");
     } catch (e: unknown) {
-      const msg = getErrorMessage(e, "Could not save course.");
+      const msg = getErrorMessage(e, "Could not add course.");
       setFormError(msg);
       toast.error(msg);
     }
@@ -154,14 +226,30 @@ export function CoursesPanel() {
     if (!pendingDelete) return;
     try {
       await deleteCourse(pendingDelete.id).unwrap();
-      toast.success("Course deleted.");
+      toast.success("Course deleted from catalog.");
       setPendingDelete(null);
     } catch (e: unknown) {
       toast.error(getErrorMessage(e, "Could not delete course."));
     }
   };
 
-  const batchLabel = (b: (typeof batches)[number]) => `Batch ${b.name ?? b.number}`;
+  const confirmUnoffer = async () => {
+    if (!pendingUnoffer || !filterBatchId) return;
+    try {
+      await unofferCourse({
+        batchId: filterBatchId,
+        courseId: String(pendingUnoffer.id),
+        semester_id: currentSemester?.id,
+      }).unwrap();
+      toast.success("Removed from this semester.");
+      setPendingUnoffer(null);
+    } catch (e: unknown) {
+      toast.error(getErrorMessage(e, "Could not remove course."));
+    }
+  };
+
+  const saving = creating || updating || offering;
+  const selectedBatch = deptBatches.find((b) => String(b.id) === filterBatchId);
 
   return (
     <>
@@ -196,11 +284,16 @@ export function CoursesPanel() {
             {deptBatches.length === 0 ? <option value="">No batches</option> : null}
             {deptBatches.map((b) => (
               <option key={b.id} value={String(b.id)}>
-                {batchLabel(b)}
+                {batchOptionLabel(b)}
               </option>
             ))}
           </select>
-          <button className="foundations__btn" type="button" onClick={openCreate} disabled={deptOptions.length === 0}>
+          <button
+            className="foundations__btn"
+            type="button"
+            onClick={openCreate}
+            disabled={deptOptions.length === 0 || !filterBatchId}
+          >
             + Add course
           </button>
         </div>
@@ -210,91 +303,79 @@ export function CoursesPanel() {
         <div className="foundations__toolbar" style={{ marginTop: 0 }}>
           <div className="foundations__toolbar-left">
             <span className="foundations__muted" style={{ margin: 0 }}>
-              {loadingCurr
-                ? "Loading curriculum…"
-                : `${selected.size} of ${filteredRows.length} course(s) in curriculum`}
+              {currentSemester ? currentSemester.name : "No current semester"}
+              {selectedBatch ? ` · ${batchOptionLabel(selectedBatch)}` : ""}
+              {loadingOffered
+                ? " · Loading…"
+                : ` · ${creditsUsed} / ${MAX_SEMESTER_CREDITS} credits this semester`}
             </span>
-          </div>
-          <div className="foundations__toolbar-right">
-            <button type="button" className="foundations__btn foundations__btn--ghost" onClick={() => setAllCurr(true)} disabled={filteredRows.length === 0}>
-              Select all
-            </button>
-            <button type="button" className="foundations__btn foundations__btn--ghost" onClick={() => setAllCurr(false)}>
-              Clear
-            </button>
-            <button
-              type="button"
-              className="foundations__btn"
-              onClick={() => void onSaveCurriculum()}
-              disabled={savingCurr || !dirty || !filterBatchId}
-            >
-              {savingCurr ? "Saving…" : dirty ? "Save curriculum" : "Saved"}
-            </button>
           </div>
         </div>
       ) : null}
 
-      {isLoading ? <p className="foundations__muted">Loading…</p> : null}
-      {error ? <p className="foundations__error">Could not load courses.</p> : null}
+      {loadingCatalog && !filterBatchId ? <p className="foundations__muted">Loading…</p> : null}
       {deptOptions.length === 0 ? <p className="foundations__muted">Create a department first.</p> : null}
+      {!currentSemester ? (
+        <p className="foundations__error">Set a current semester in Semesters before offering courses.</p>
+      ) : null}
 
       <div className="foundations__table-wrap">
         <table className="foundations__table">
           <thead>
             <tr>
-              {filterBatchId ? <th style={{ width: 56 }}>In curriculum</th> : null}
-              <th>Department</th>
-              <th>Name</th>
               <th>Code</th>
+              <th>Name</th>
+              <th>Type</th>
+              <th>Credits</th>
               <th style={{ width: 160 }}>Actions</th>
             </tr>
           </thead>
           <tbody>
-            {filteredRows.length === 0 ? (
+            {offered.length === 0 ? (
               <tr>
-                <td colSpan={filterBatchId ? 5 : 4} className="foundations__empty">
-                  No courses yet.
+                <td colSpan={5} className="foundations__empty">
+                  {filterBatchId
+                    ? "No courses offered to this batch this semester. Add them one by one."
+                    : "Select a department and batch."}
                 </td>
               </tr>
             ) : (
-              filteredRows.map((c) => {
-                const id = String(c.id);
-                return (
-                  <tr key={c.id}>
-                    {filterBatchId ? (
-                      <td>
-                        <input
-                          type="checkbox"
-                          checked={selected.has(id)}
-                          onChange={() => toggleCurr(id)}
-                          aria-label={`Include ${c.code} in curriculum`}
-                        />
-                      </td>
-                    ) : null}
-                    <td>{c.dept_name || "—"}</td>
-                    <td>
-                      <strong>{c.name}</strong>
-                    </td>
-                    <td>{c.code}</td>
-                    <td>
-                      <div className="foundations__actions">
-                        <button type="button" className="foundations__icon-btn" onClick={() => openEdit(c)} aria-label="Edit">
-                          <IconEdit />
-                        </button>
-                        <button
-                          type="button"
-                          className="foundations__icon-btn foundations__icon-btn--danger"
-                          disabled={deleting}
-                          onClick={() => setPendingDelete(c)}
-                          aria-label="Delete"
-                        >
-                          <IconTrash />
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                );
-              })
+              offered.map((c) => (
+                <tr key={c.id}>
+                  <td>{c.code}</td>
+                  <td>
+                    <strong>{c.name}</strong>
+                  </td>
+                  <td>{c.kind === "LAB" ? "Lab" : "Theory"}</td>
+                  <td>{c.credit}</td>
+                  <td>
+                    <div className="foundations__actions">
+                      <button type="button" className="foundations__icon-btn" onClick={() => openEdit(c)} aria-label="Edit">
+                        <IconEdit />
+                      </button>
+                      <button
+                        type="button"
+                        className="foundations__icon-btn"
+                        disabled={unoffering}
+                        onClick={() => setPendingUnoffer(c)}
+                        aria-label="Remove from this semester"
+                        title="Remove from this semester"
+                      >
+                        ×
+                      </button>
+                      <button
+                        type="button"
+                        className="foundations__icon-btn foundations__icon-btn--danger"
+                        disabled={deleting}
+                        onClick={() => setPendingDelete(c)}
+                        aria-label="Delete from catalog"
+                      >
+                        <IconTrash />
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              ))
             )}
           </tbody>
         </table>
@@ -302,15 +383,15 @@ export function CoursesPanel() {
 
       <Modal
         open={open}
-        title={editing ? "Edit course" : "Add course"}
+        title={editing ? "Edit course" : "Add course this semester"}
         onClose={() => setOpen(false)}
         footer={
           <div className="foundations__modal-actions">
             <button className="foundations__btn foundations__btn--ghost" type="button" onClick={() => setOpen(false)}>
               Cancel
             </button>
-            <button className="foundations__btn" type="button" disabled={creating || updating} onClick={() => void submit()}>
-              {creating || updating ? "Saving…" : "Save"}
+            <button className="foundations__btn" type="button" disabled={saving} onClick={() => void submit()}>
+              {saving ? "Saving…" : editing ? "Save" : "Add"}
             </button>
           </div>
         }
@@ -318,7 +399,19 @@ export function CoursesPanel() {
         <div className="foundations__form">
           <label className="foundations__field">
             <span>Department</span>
-            <select value={formDeptId} onChange={(e) => setFormDeptId(e.target.value)}>
+            <select
+              value={formDeptId}
+              onChange={(e) => {
+                const next = e.target.value;
+                setFormDeptId(next);
+                const nextBatches = batches.filter((b) => String(b.dept_id) === next);
+                if (!nextBatches.some((b) => String(b.id) === formBatchId)) {
+                  setFormBatchId(String(nextBatches[0]?.id ?? ""));
+                }
+                setFormCourseId("");
+              }}
+              disabled={Boolean(editing)}
+            >
               {deptOptions.map((d) => (
                 <option key={d.id} value={d.id}>
                   {d.label}
@@ -326,22 +419,110 @@ export function CoursesPanel() {
               ))}
             </select>
           </label>
-          <label className="foundations__field">
-            <span>Course name</span>
-            <input value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Data Structures" />
-          </label>
-          <label className="foundations__field">
-            <span>Course code</span>
-            <input value={code} onChange={(e) => setCode(e.target.value)} placeholder="e.g. CSE2201" />
-          </label>
+          {!editing ? (
+            <label className="foundations__field">
+              <span>Batch</span>
+              {formBatches.length === 0 ? (
+                <p className="foundations__muted" style={{ margin: 0 }}>
+                  No batches for this department — create them in <strong>Batches</strong> first.
+                </p>
+              ) : (
+                <select value={formBatchId} onChange={(e) => { setFormBatchId(e.target.value); setFormCourseId(""); }}>
+                  {formBatches.map((b) => (
+                    <option key={b.id} value={String(b.id)}>
+                      {batchOptionLabel(b)}
+                    </option>
+                  ))}
+                </select>
+              )}
+            </label>
+          ) : null}
+          {currentSemester ? (
+            <p className="foundations__muted" style={{ margin: 0 }}>
+              Offering for <strong>{currentSemester.name}</strong>
+              {!editing ? ` · ${formCreditsUsed} / ${MAX_SEMESTER_CREDITS} credits used` : ""}
+            </p>
+          ) : null}
+
+          {editing ? (
+            <>
+              <label className="foundations__field">
+                <span>Course name</span>
+                <input value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Data Structures" />
+              </label>
+              <label className="foundations__field">
+                <span>Course code</span>
+                <input value={code} onChange={(e) => setCode(e.target.value)} placeholder="e.g. CSE-2215" />
+              </label>
+              <label className="foundations__field">
+                <span>Type</span>
+                <select value={kind} onChange={(e) => setKind(e.target.value as CourseKind)}>
+                  <option value="THEORY">Theory · 3 credits</option>
+                  <option value="LAB">Lab · 1 credit</option>
+                </select>
+              </label>
+            </>
+          ) : (
+            <>
+              <label className="foundations__check-item" style={{ margin: 0 }}>
+                <input type="checkbox" checked={createNew} onChange={(e) => { setCreateNew(e.target.checked); setFormCourseId(""); }} />
+                <span>Create a new catalog course</span>
+              </label>
+              {createNew ? (
+                <>
+                  <label className="foundations__field">
+                    <span>Course name</span>
+                    <input value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Data Structures" />
+                  </label>
+                  <label className="foundations__field">
+                    <span>Course code</span>
+                    <input value={code} onChange={(e) => setCode(e.target.value)} placeholder="e.g. CSE-2215" />
+                  </label>
+                  <label className="foundations__field">
+                    <span>Type</span>
+                    <select value={kind} onChange={(e) => setKind(e.target.value as CourseKind)}>
+                      <option value="THEORY">Theory · 3 credits</option>
+                      <option value="LAB">Lab · 1 credit</option>
+                    </select>
+                  </label>
+                </>
+              ) : (
+                <label className="foundations__field">
+                  <span>Course</span>
+                  <select value={formCourseId} onChange={(e) => setFormCourseId(e.target.value)}>
+                    <option value="">{pickerCourses.length === 0 ? "No remaining catalog courses" : "Select a course"}</option>
+                    {pickerCourses.map((c) => (
+                      <option key={c.id} value={String(c.id)}>
+                        {c.code} — {c.name} ({c.kind === "LAB" ? "Lab 1 cr" : "Theory 3 cr"})
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              )}
+              {wouldExceed ? (
+                <div className="foundations__error">
+                  Adding this course would exceed {MAX_SEMESTER_CREDITS} credits this semester.
+                </div>
+              ) : null}
+            </>
+          )}
           {formError ? <div className="foundations__error">{formError}</div> : null}
         </div>
       </Modal>
 
       <ConfirmModal
+        open={Boolean(pendingUnoffer)}
+        title="Remove from this semester"
+        message={`Stop offering "${pendingUnoffer?.code ?? ""}" to this batch this semester? The catalog course stays.`}
+        busy={unoffering}
+        onClose={() => setPendingUnoffer(null)}
+        onConfirm={() => void confirmUnoffer()}
+      />
+
+      <ConfirmModal
         open={Boolean(pendingDelete)}
         title="Delete course"
-        message={`Delete course "${pendingDelete?.name ?? ""}"?`}
+        message={`Delete "${pendingDelete?.name ?? ""}" from the catalog? This removes it from every batch.`}
         busy={deleting}
         onClose={() => setPendingDelete(null)}
         onConfirm={() => void confirmDelete()}

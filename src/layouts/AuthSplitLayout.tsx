@@ -21,9 +21,22 @@ export function AuthSplitLayout({
   quoteRole: _quoteRole,
   panelImageSrc: _panelImageSrc,
 }: AuthSplitLayoutProps) {
-  // Right-panel image 
-  const images = [wideForm ? "/ius.jpg" : "/ius1.jpg"];
-  const hasImages = images.length > 0;
+  const panelImage = wideForm
+    ? {
+        src: "/ius.webp",
+        srcSet: "/ius-960.webp 960w, /ius.webp 1280w",
+        width: 1280,
+        height: 960,
+      }
+    : {
+        src: "/ius1.webp",
+        srcSet: "/ius1-960.webp 960w, /ius1.webp 1920w",
+        width: 1920,
+        height: 1280,
+      };
+  const image = _panelImageSrc
+    ? { src: _panelImageSrc, srcSet: undefined, width: panelImage.width, height: panelImage.height }
+    : panelImage;
 
   return (
     <div className="auth-split">
@@ -34,15 +47,19 @@ export function AuthSplitLayout({
       </div>
 
       <aside className="auth-split__panel" data-auth-variant={wideForm ? "register" : "login"} aria-label="Branding">
-        {hasImages ? (
-          <div className="auth-split__image-grid auth-split__image-grid--single" aria-hidden>
-            {images.map((src) => (
-              <img key={src} className="auth-split__image" src={src} alt="" />
-            ))}
-          </div>
-        ) : (
-          <div className="auth-split__panel-fallback" aria-hidden />
-        )}
+        <div className="auth-split__image-grid auth-split__image-grid--single" aria-hidden>
+          <img
+            className="auth-split__image"
+            src={image.src}
+            srcSet={image.srcSet}
+            sizes="(max-width: 960px) 100vw, 50vw"
+            width={image.width}
+            height={image.height}
+            alt=""
+            decoding="async"
+            fetchPriority="high"
+          />
+        </div>
       </aside>
     </div>
   );
