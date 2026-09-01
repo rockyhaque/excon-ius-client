@@ -12,7 +12,10 @@ import {
 import { mapBatches, mapSections } from "@/components/foundations/foundations.types";
 import type { Section } from "@/types/foundations";
 import { IconEdit, IconTrash } from "@/components/ui/Icons";
+import { SortableTh, useSort, sortSign } from "@/components/foundations/tableSort";
 import { toast } from "react-toastify";
+
+type SectionSortKey = "dept" | "batch" | "section";
 
 export function SectionsPanel() {
   const { data: batchesRaw = [] } = useGetBatchesQuery({ limit: 500 });
@@ -24,6 +27,38 @@ export function SectionsPanel() {
   }, [batchesRaw]);
 
   const rows = mapSections(rowsRaw);
+
+  const [filterDept, setFilterDept] = useState<string>("");
+  const [filterBatch, setFilterBatch] = useState<string>("");
+  const { sort, onSort } = useSort<SectionSortKey>("batch", "desc");
+
+  const deptFilterOptions = useMemo(
+    () => Array.from(new Set(rows.map((s) => s.dept_name).filter((d): d is string => !!d))).sort((a, b) => a.localeCompare(b)),
+    [rows],
+  );
+  const batchFilterOptions = useMemo(
+    () =>
+      Array.from(new Set(rows.map((s) => s.batch_name).filter((b): b is string => !!b))).sort(
+        (a, b) => Number(a) - Number(b),
+      ),
+    [rows],
+  );
+
+  const viewRows = useMemo(() => {
+    const sign = sortSign(sort.dir);
+    return rows
+      .filter((s) => (filterDept ? s.dept_name === filterDept : true))
+      .filter((s) => (filterBatch ? s.batch_name === filterBatch : true))
+      .sort((a, b) => {
+        let primary = 0;
+        if (sort.key === "batch") primary = Number(a.batch_name ?? 0) - Number(b.batch_name ?? 0);
+        else if (sort.key === "section") primary = (a.name ?? "").localeCompare(b.name ?? "");
+        else primary = (a.dept_name ?? "").localeCompare(b.dept_name ?? "");
+        if (primary !== 0) return primary * sign;
+        // stable tiebreak, always ascending: keep sections grouped by batch then letter
+        return Number(a.batch_name ?? 0) - Number(b.batch_name ?? 0) || (a.name ?? "").localeCompare(b.name ?? "");
+      });
+  }, [rows, filterDept, filterBatch, sort]);
 
   const [createSection, { isLoading: creating }] = useCreateSectionMutation();
   const [updateSection, { isLoading: updating }] = useUpdateSectionMutation();
@@ -95,6 +130,32 @@ export function SectionsPanel() {
           </h2>
         </div>
         <div className="foundations__toolbar-right">
+          <select
+            className="foundations__filter-control"
+            value={filterDept}
+            onChange={(e) => setFilterDept(e.target.value)}
+            aria-label="Filter by department"
+          >
+            <option value="">All departments</option>
+            {deptFilterOptions.map((d) => (
+              <option key={d} value={d}>
+                {d}
+              </option>
+            ))}
+          </select>
+          <select
+            className="foundations__filter-control"
+            value={filterBatch}
+            onChange={(e) => setFilterBatch(e.target.value)}
+            aria-label="Filter by batch"
+          >
+            <option value="">All batches</option>
+            {batchFilterOptions.map((b) => (
+              <option key={b} value={b}>
+                Batch {b}
+              </option>
+            ))}
+          </select>
           {batchOptions.length === 0 ? <span className="foundations__muted">Create a batch first.</span> : null}
           <button className="foundations__btn" type="button" onClick={openCreate} disabled={batchOptions.length === 0}>
             + Add section
@@ -109,9 +170,9 @@ export function SectionsPanel() {
         <table className="foundations__table">
           <thead>
             <tr>
-              <th>Department</th>
-              <th>Batch</th>
-              <th>Section</th>
+              <SortableTh label="Department" sortKey="dept" sort={sort} onSort={onSort} />
+              <SortableTh label="Batch" sortKey="batch" sort={sort} onSort={onSort} />
+              <SortableTh label="Section" sortKey="section" sort={sort} onSort={onSort} />
               <th style={{ width: 160 }}>Actions</th>
             </tr>
           </thead>
@@ -122,8 +183,14 @@ export function SectionsPanel() {
                   No sections yet.
                 </td>
               </tr>
+            ) : viewRows.length === 0 ? (
+              <tr>
+                <td colSpan={4} className="foundations__empty">
+                  No sections match these filters.
+                </td>
+              </tr>
             ) : (
-              rows.map((s) => (
+              viewRows.map((s) => (
                 <tr key={s.id}>
                   <td>{s.dept_name || "—"}</td>
                   <td>{s.batch_name || "—"}</td>

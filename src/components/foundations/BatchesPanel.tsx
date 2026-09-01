@@ -12,7 +12,10 @@ import {
 import { mapBatches, mapDepartments } from "@/components/foundations/foundations.types";
 import type { Batch, BatchStatus } from "@/types/foundations";
 import { IconEdit, IconTrash } from "@/components/ui/Icons";
+import { SortableTh, useSort, sortSign } from "@/components/foundations/tableSort";
 import { toast } from "react-toastify";
+
+type BatchSortKey = "dept" | "number" | "status";
 
 export function BatchesPanel() {
   const { data: departmentsRaw = [] } = useGetDepartmentsQuery({ limit: 100 });
@@ -24,6 +27,26 @@ export function BatchesPanel() {
   }, [departmentsRaw]);
 
   const rows = mapBatches(rowsRaw);
+
+  const [filterDeptId, setFilterDeptId] = useState<string>("");
+  const [filterStatus, setFilterStatus] = useState<"" | BatchStatus>("");
+  const { sort, onSort } = useSort<BatchSortKey>("number", "asc");
+
+  const viewRows = useMemo(() => {
+    const sign = sortSign(sort.dir);
+    return rows
+      .filter((b) => (filterDeptId ? String(b.dept_id) === filterDeptId : true))
+      .filter((b) => (filterStatus ? (b.status ?? "RUNNING") === filterStatus : true))
+      .sort((a, b) => {
+        let primary = 0;
+        if (sort.key === "number") primary = (a.number ?? 0) - (b.number ?? 0);
+        else if (sort.key === "status") primary = (a.status ?? "").localeCompare(b.status ?? "");
+        else primary = (a.dept_name ?? "").localeCompare(b.dept_name ?? "");
+        if (primary !== 0) return primary * sign;
+        // stable tiebreak, always ascending: department then batch number
+        return (a.dept_name ?? "").localeCompare(b.dept_name ?? "") || (a.number ?? 0) - (b.number ?? 0);
+      });
+  }, [rows, filterDeptId, filterStatus, sort]);
 
   const [createBatch, { isLoading: creating }] = useCreateBatchMutation();
   const [updateBatch, { isLoading: updating }] = useUpdateBatchMutation();
@@ -99,6 +122,29 @@ export function BatchesPanel() {
           </h2>
         </div>
         <div className="foundations__toolbar-right">
+          <select
+            className="foundations__filter-control"
+            value={filterDeptId}
+            onChange={(e) => setFilterDeptId(e.target.value)}
+            aria-label="Filter by department"
+          >
+            <option value="">All departments</option>
+            {deptOptions.map((d) => (
+              <option key={d.id} value={String(d.id)}>
+                {d.label}
+              </option>
+            ))}
+          </select>
+          <select
+            className="foundations__filter-control"
+            value={filterStatus}
+            onChange={(e) => setFilterStatus(e.target.value as "" | BatchStatus)}
+            aria-label="Filter by status"
+          >
+            <option value="">All statuses</option>
+            <option value="RUNNING">Running</option>
+            <option value="COMPLETED">Completed</option>
+          </select>
           {deptOptions.length === 0 ? <span className="foundations__muted">Create a department first.</span> : null}
           <button className="foundations__btn" type="button" onClick={openCreate} disabled={deptOptions.length === 0}>
             + Add batch
@@ -113,9 +159,9 @@ export function BatchesPanel() {
         <table className="foundations__table">
           <thead>
             <tr>
-              <th>Department</th>
-              <th>Batch</th>
-              <th>Status</th>
+              <SortableTh label="Department" sortKey="dept" sort={sort} onSort={onSort} />
+              <SortableTh label="Batch" sortKey="number" sort={sort} onSort={onSort} />
+              <SortableTh label="Status" sortKey="status" sort={sort} onSort={onSort} />
               <th style={{ width: 160 }}>Actions</th>
             </tr>
           </thead>
@@ -126,8 +172,14 @@ export function BatchesPanel() {
                   No batches yet.
                 </td>
               </tr>
+            ) : viewRows.length === 0 ? (
+              <tr>
+                <td colSpan={4} className="foundations__empty">
+                  No batches match these filters.
+                </td>
+              </tr>
             ) : (
-              rows.map((b) => (
+              viewRows.map((b) => (
                 <tr key={b.id}>
                   <td>{b.dept_name || "—"}</td>
                   <td>

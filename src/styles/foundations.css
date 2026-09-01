@@ -173,6 +173,36 @@
   white-space: nowrap;
 }
 
+.foundations__th-sort {
+  appearance: none;
+  background: none;
+  border: 0;
+  padding: 0;
+  margin: 0;
+  font: inherit;
+  font-weight: 700;
+  color: inherit;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.foundations__th-sort:hover {
+  color: #111827;
+}
+
+.foundations__sort-ind {
+  font-size: 11px;
+  line-height: 1;
+  opacity: 0.45;
+}
+
+.foundations__sort-ind--active {
+  opacity: 1;
+  color: #7a1230;
+}
+
 .foundations__table tr:last-child td {
   border-bottom: none;
 }
