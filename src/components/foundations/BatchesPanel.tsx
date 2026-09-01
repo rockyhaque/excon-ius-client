@@ -29,7 +29,7 @@ export function BatchesPanel() {
   const rows = mapBatches(rowsRaw);
 
   const [filterDeptId, setFilterDeptId] = useState<string>("");
-  const [filterStatus, setFilterStatus] = useState<"" | BatchStatus>("");
+  const [filterStatus, setFilterStatus] = useState<"" | BatchStatus>("RUNNING");
   const { sort, onSort } = useSort<BatchSortKey>("number", "asc");
 
   const viewRows = useMemo(() => {
