@@ -503,6 +503,102 @@
   accent-color: #7a1230;
 }
 
+.foundations__ms-search {
+  padding: 10px 10px 0;
+}
+
+.foundations__ms-search input {
+  box-sizing: border-box;
+  width: 100%;
+  height: 38px;
+  border: 1px solid #d1d5db;
+  border-radius: 9px;
+  padding: 0 12px;
+  font: inherit;
+  color: #111827;
+  background: #fff;
+}
+
+.foundations__ms-search input:focus {
+  outline: none;
+  border-color: #7a1230;
+  box-shadow: 0 0 0 3px rgba(122, 18, 48, 0.12);
+}
+
+.foundations__ms-group-head {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 8px;
+  background: none;
+  border: 0;
+  border-radius: 8px;
+  font: inherit;
+  cursor: pointer;
+  text-align: left;
+}
+
+.foundations__ms-group-head:hover {
+  background: #f5f3f4;
+}
+
+.foundations__ms-gcaret {
+  color: #9ca3af;
+  font-size: 0.75rem;
+  transition: transform 0.12s ease;
+  flex: none;
+}
+
+.foundations__ms-gcaret--open {
+  transform: rotate(90deg);
+}
+
+.foundations__ms-gcode {
+  flex: none;
+  font-size: 0.68rem;
+  font-weight: 800;
+  color: #7a1230;
+  background: #fbeef2;
+  border-radius: 6px;
+  padding: 2px 6px;
+  letter-spacing: 0.03em;
+}
+
+.foundations__ms-gname {
+  flex: 1;
+  min-width: 0;
+  font-size: 0.74rem;
+  font-weight: 700;
+  color: #4b5563;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.foundations__ms-gcount {
+  flex: none;
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: #6b7280;
+  background: #f3f4f6;
+  border-radius: 999px;
+  padding: 1px 8px;
+}
+
+.foundations__ms-group > .foundations__ms-item {
+  margin-left: 14px;
+}
+
+.foundations__ms-empty {
+  padding: 16px 12px;
+  text-align: center;
+  color: #6b7280;
+  font-size: 0.88rem;
+}
+
 .foundations__modal-actions {
   display: flex;
   gap: 10px;

@@ -175,7 +175,7 @@ export function ExamRoutinePanel() {
 
   const { data: deptRaw } = useGetDepartmentsQuery({ limit: 100 });
   const genDepartments = useMemo(
-    () => arr(deptRaw).map((x) => ({ id: s(x.id), name: s(x.name) })).filter((d) => d.id && d.name),
+    () => arr(deptRaw).map((x) => ({ id: s(x.id), name: s(x.name), code: s(x.code) })).filter((d) => d.id && d.name),
     [deptRaw],
   );
 
@@ -322,8 +322,15 @@ export function ExamRoutinePanel() {
       return next;
     });
   };
-  const setAllBatches = (on: boolean) =>
-    setSelectedBatchIds(on ? new Set(runningBatches.map((b) => String(b.id))) : new Set());
+  const setManyBatches = (ids: string[], on: boolean) =>
+    setSelectedBatchIds((prev) => {
+      const next = new Set(prev);
+      for (const id of ids) {
+        if (on) next.add(id);
+        else next.delete(id);
+      }
+      return next;
+    });
 
   const openGenerate = () => {
     setGenSem(semesterId || semesters[0]?.id || "");
@@ -807,8 +814,7 @@ export function ExamRoutinePanel() {
                   groupByDept={!genDept && genDepartments.length > 0}
                   selected={selectedBatchIds}
                   onToggle={toggleBatch}
-                  onSelectAll={() => setAllBatches(true)}
-                  onClear={() => setAllBatches(false)}
+                  onSetMany={setManyBatches}
                 />
                 <span className="foundations__muted" style={{ margin: "6px 0 0", fontSize: 12.5 }}>
                   Only running batches are shown — completed batches don't sit exams.
