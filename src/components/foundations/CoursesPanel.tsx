@@ -10,12 +10,14 @@ import {
   useGetCoursesQuery,
   useGetDepartmentsQuery,
   useGetSemestersQuery,
+  useGetCourseTypesQuery,
+  useGetAcademicSettingsQuery,
   useOfferBatchCourseMutation,
   useUnofferBatchCourseMutation,
   useUpdateCourseMutation,
 } from "@/redux/features/foundations/foundations.api";
 import { batchOptionLabel, mapBatches, mapCourses, mapDepartments } from "@/components/foundations/foundations.types";
-import type { Course, CourseKind } from "@/types/foundations";
+import type { Course } from "@/types/foundations";
 import { MAX_SEMESTER_CREDITS } from "@/types/foundations";
 import { IconEdit, IconTrash } from "@/components/ui/Icons";
 import { toast } from "react-toastify";
@@ -24,6 +26,17 @@ export function CoursesPanel() {
   const { data: departmentsRaw = [] } = useGetDepartmentsQuery({ limit: 100 });
   const { data: batchesRaw = [] } = useGetBatchesQuery({ limit: 500 });
   const { data: semestersRaw = [] } = useGetSemestersQuery();
+
+  // Credit rules are now data-driven (Foundations → Credits): the course-type list and the cap.
+  const { data: courseTypesRaw = [] } = useGetCourseTypesQuery();
+  const courseTypes = useMemo(
+    () => (courseTypesRaw as Record<string, unknown>[]).map((t) => ({ code: String(t.code), name: String(t.name), credit: Number(t.credit) })),
+    [courseTypesRaw],
+  );
+  const creditForCode = (c: string) => courseTypes.find((t) => t.code.toUpperCase() === String(c).toUpperCase())?.credit ?? 0;
+  const typeName = (c: string) => courseTypes.find((t) => t.code.toUpperCase() === String(c).toUpperCase())?.name ?? String(c);
+  const { data: acadSettings } = useGetAcademicSettingsQuery();
+  const maxCredits = acadSettings?.max_semester_credits ?? MAX_SEMESTER_CREDITS;
   const [filterDeptId, setFilterDeptId] = useState("");
   const { data: catalogRaw = [], isLoading: loadingCatalog } = useGetCoursesQuery(
     { limit: 500, dept_id: filterDeptId },
@@ -94,7 +107,7 @@ export function CoursesPanel() {
   const [createNew, setCreateNew] = useState(false);
   const [name, setName] = useState("");
   const [code, setCode] = useState("");
-  const [kind, setKind] = useState<CourseKind>("THEORY");
+  const [kind, setKind] = useState<string>("THEORY");
   const [formError, setFormError] = useState<string | null>(null);
 
   const formBatches = useMemo(
@@ -122,8 +135,8 @@ export function CoursesPanel() {
   );
 
   const selectedPicker = pickerCourses.find((c) => String(c.id) === formCourseId);
-  const addCredit = createNew || editing ? (kind === "LAB" ? 1 : 3) : selectedPicker?.credit || 0;
-  const remaining = MAX_SEMESTER_CREDITS - formCreditsUsed;
+  const addCredit = createNew || editing ? creditForCode(kind) : selectedPicker?.credit || 0;
+  const remaining = maxCredits - formCreditsUsed;
   const wouldExceed = !editing && addCredit > remaining;
 
   const openCreate = () => {
@@ -135,7 +148,7 @@ export function CoursesPanel() {
     setCreateNew(false);
     setName("");
     setCode("");
-    setKind("THEORY");
+    setKind(courseTypes[0]?.code ?? "THEORY");
     setFormError(null);
     setOpen(true);
   };
@@ -148,7 +161,7 @@ export function CoursesPanel() {
     setCreateNew(false);
     setName(c.name);
     setCode(c.code);
-    setKind(c.kind === "LAB" ? "LAB" : "THEORY");
+    setKind(String(c.kind || courseTypes[0]?.code || "THEORY"));
     setFormError(null);
     setOpen(true);
   };
@@ -184,7 +197,7 @@ export function CoursesPanel() {
       return;
     }
     if (wouldExceed) {
-      setFormError(`This batch already has ${formCreditsUsed} credits. A student may take at most ${MAX_SEMESTER_CREDITS} credits per semester.`);
+      setFormError(`This batch already has ${formCreditsUsed} credits. A student may take at most ${maxCredits} credits per semester.`);
       return;
     }
 
@@ -307,7 +320,7 @@ export function CoursesPanel() {
               {selectedBatch ? ` · ${batchOptionLabel(selectedBatch)}` : ""}
               {loadingOffered
                 ? " · Loading…"
-                : ` · ${creditsUsed} / ${MAX_SEMESTER_CREDITS} credits this semester`}
+                : ` · ${creditsUsed} / ${maxCredits} credits this semester`}
             </span>
           </div>
         </div>
@@ -346,7 +359,7 @@ export function CoursesPanel() {
                   <td>
                     <strong>{c.name}</strong>
                   </td>
-                  <td>{c.kind === "LAB" ? "Lab" : "Theory"}</td>
+                  <td>{typeName(String(c.kind))}</td>
                   <td>{c.credit}</td>
                   <td>
                     <div className="foundations__actions">
@@ -440,7 +453,7 @@ export function CoursesPanel() {
           {currentSemester ? (
             <p className="foundations__muted" style={{ margin: 0 }}>
               Offering for <strong>{currentSemester.name}</strong>
-              {!editing ? ` · ${formCreditsUsed} / ${MAX_SEMESTER_CREDITS} credits used` : ""}
+              {!editing ? ` · ${formCreditsUsed} / ${maxCredits} credits used` : ""}
             </p>
           ) : null}
 
@@ -456,9 +469,12 @@ export function CoursesPanel() {
               </label>
               <label className="foundations__field">
                 <span>Type</span>
-                <select value={kind} onChange={(e) => setKind(e.target.value as CourseKind)}>
-                  <option value="THEORY">Theory · 3 credits</option>
-                  <option value="LAB">Lab · 1 credit</option>
+                <select value={kind} onChange={(e) => setKind(e.target.value)}>
+                  {courseTypes.map((t) => (
+                    <option key={t.code} value={t.code}>
+                      {t.name} · {t.credit} {t.credit === 1 ? "credit" : "credits"}
+                    </option>
+                  ))}
                 </select>
               </label>
             </>
@@ -480,9 +496,12 @@ export function CoursesPanel() {
                   </label>
                   <label className="foundations__field">
                     <span>Type</span>
-                    <select value={kind} onChange={(e) => setKind(e.target.value as CourseKind)}>
-                      <option value="THEORY">Theory · 3 credits</option>
-                      <option value="LAB">Lab · 1 credit</option>
+                    <select value={kind} onChange={(e) => setKind(e.target.value)}>
+                      {courseTypes.map((t) => (
+                        <option key={t.code} value={t.code}>
+                          {t.name} · {t.credit} {t.credit === 1 ? "credit" : "credits"}
+                        </option>
+                      ))}
                     </select>
                   </label>
                 </>
@@ -493,7 +512,7 @@ export function CoursesPanel() {
                     <option value="">{pickerCourses.length === 0 ? "No remaining catalog courses" : "Select a course"}</option>
                     {pickerCourses.map((c) => (
                       <option key={c.id} value={String(c.id)}>
-                        {c.code} — {c.name} ({c.kind === "LAB" ? "Lab 1 cr" : "Theory 3 cr"})
+                        {c.code} — {c.name} ({typeName(String(c.kind))} {c.credit} cr)
                       </option>
                     ))}
                   </select>
@@ -501,7 +520,7 @@ export function CoursesPanel() {
               )}
               {wouldExceed ? (
                 <div className="foundations__error">
-                  Adding this course would exceed {MAX_SEMESTER_CREDITS} credits this semester.
+                  Adding this course would exceed {maxCredits} credits this semester.
                 </div>
               ) : null}
             </>

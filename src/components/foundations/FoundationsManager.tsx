@@ -6,6 +6,7 @@ import { BatchesPanel } from "@/components/foundations/BatchesPanel";
 import { SectionsPanel } from "@/components/foundations/SectionsPanel";
 import { CoursesPanel } from "@/components/foundations/CoursesPanel";
 import { SemestersPanel } from "@/components/foundations/SemestersPanel";
+import { CreditsPanel } from "@/components/foundations/CreditsPanel";
 import {
   useGetBatchesQuery,
   useGetCoursesQuery,
@@ -15,7 +16,7 @@ import {
 } from "@/redux/features/foundations/foundations.api";
 import { mapBatches, mapCourses, mapDepartments, mapSections } from "@/components/foundations/foundations.types";
 
-type FoundationsTab = "departments" | "batches" | "sections" | "courses" | "semesters";
+type FoundationsTab = "departments" | "batches" | "sections" | "courses" | "semesters" | "credits";
 
 const TAB_LABEL: Record<FoundationsTab, string> = {
   departments: "Departments",
@@ -23,6 +24,7 @@ const TAB_LABEL: Record<FoundationsTab, string> = {
   sections: "Sections",
   courses: "Courses",
   semesters: "Semesters",
+  credits: "Credits",
 };
 
 export function FoundationsManager() {
@@ -91,8 +93,10 @@ export function FoundationsManager() {
           <SectionsPanel />
         ) : tab === "courses" ? (
           <CoursesPanel />
-        ) : (
+        ) : tab === "semesters" ? (
           <SemestersPanel />
+        ) : (
+          <CreditsPanel />
         )}
       </div>
     </div>

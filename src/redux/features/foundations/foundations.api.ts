@@ -96,6 +96,31 @@ export const foundationsApi = baseApi.injectEndpoints({
       query: (id) => ({ url: `/foundations/semesters/${id}`, method: "DELETE" }),
       invalidatesTags: ["FOUNDATIONS"],
     }),
+    getCourseTypes: builder.query<FoundationEntity[], void>({
+      query: () => ({ url: "/foundations/course-types", method: "GET" }),
+      transformResponse: normalizeListResponse,
+      providesTags: ["FOUNDATIONS"],
+    }),
+    createCourseType: builder.mutation<FoundationEntity, { name: string; code: string; credit: number }>({
+      query: (data) => ({ url: "/foundations/course-types", method: "POST", data }),
+      invalidatesTags: ["FOUNDATIONS"],
+    }),
+    updateCourseType: builder.mutation<FoundationEntity, { id: number | string; data: Record<string, unknown> }>({
+      query: ({ id, data }) => ({ url: `/foundations/course-types/${id}`, method: "PUT", data }),
+      invalidatesTags: ["FOUNDATIONS"],
+    }),
+    deleteCourseType: builder.mutation<{ message: string }, number | string>({
+      query: (id) => ({ url: `/foundations/course-types/${id}`, method: "DELETE" }),
+      invalidatesTags: ["FOUNDATIONS"],
+    }),
+    getAcademicSettings: builder.query<{ max_semester_credits: number }, void>({
+      query: () => ({ url: "/foundations/academic-settings", method: "GET" }),
+      providesTags: ["FOUNDATIONS"],
+    }),
+    updateAcademicSettings: builder.mutation<{ max_semester_credits: number }, { max_semester_credits: number }>({
+      query: (data) => ({ url: "/foundations/academic-settings", method: "PUT", data }),
+      invalidatesTags: ["FOUNDATIONS"],
+    }),
     getBatchCourses: builder.query<FoundationEntity[], string>({
       query: (batchId) => ({ url: `/foundations/batches/${batchId}/courses`, method: "GET" }),
       transformResponse: normalizeListResponse,
@@ -158,6 +183,12 @@ export const {
   useCreateSemesterMutation,
   useUpdateSemesterMutation,
   useDeleteSemesterMutation,
+  useGetCourseTypesQuery,
+  useCreateCourseTypeMutation,
+  useUpdateCourseTypeMutation,
+  useDeleteCourseTypeMutation,
+  useGetAcademicSettingsQuery,
+  useUpdateAcademicSettingsMutation,
   useGetBatchCoursesQuery,
   useOfferBatchCourseMutation,
   useUnofferBatchCourseMutation,
