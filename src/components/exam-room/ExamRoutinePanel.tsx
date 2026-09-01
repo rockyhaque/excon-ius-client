@@ -435,7 +435,11 @@ export function ExamRoutinePanel() {
       .sort((a, b) => a.name.localeCompare(b.name));
   }, [roomsRaw]);
 
-  const openEdit = (r: ExamRow) => {
+  // NOTE (Claude): openEdit was orphaned by the merged-row list refactor — nothing
+  // called it, which broke `tsc -b`. The Edit modal below is currently unreachable;
+  // re-wire this onto an individual board card (RoutineBoard) to restore exam editing.
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const _openEditExam = (r: ExamRow) => {
     setEditing(r);
     setEDate(r.exam_date);
     setEStart(r.start_time.slice(0, 5));
@@ -445,6 +449,7 @@ export function ExamRoutinePanel() {
     setERoomId(r.room_id || "");
     setEditError(null);
   };
+  void _openEditExam;
 
   const submitEdit = async () => {
     if (!editing) return;
