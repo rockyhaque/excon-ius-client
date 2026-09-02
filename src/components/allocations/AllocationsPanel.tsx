@@ -1,8 +1,6 @@
 import { useMemo, useState } from "react";
 import { toast } from "react-toastify";
 import "@/styles/overview.css";
-import { Modal } from "@/components/ui/Modal";
-import { IconEdit } from "@/components/ui/Icons";
 import { getErrorMessage } from "@/utils/getErrorMessage";
 import { ChartCard, DonutChart, HBarList, VIZ } from "@/components/overview/charts";
 import { countBy } from "@/utils/stats";
@@ -28,151 +26,20 @@ import {
   printDocument,
   stampName,
 } from "@/utils/exports";
-
-type AiSummary = {
-  total_assigned: number;
-  skipped_no_room: number;
-  skipped_no_teacher: number;
-  exams_fully_staffed: number;
-  exams_partial: number;
-  students_per_invigilator: number;
-};
-
-type Tab = "draft" | "published";
-type RoomOption = { id: string; name: string; capacity: number | null; is_defect: boolean };
-
-function fmtDate(v: string): string {
-  return v ? v.slice(0, 10) : "—";
-}
-function fmtTime(v: string): string {
-  return v ? v.slice(0, 5) : "—";
-}
-function toCount(v: unknown): number {
-  const n = Number(v);
-  return Number.isFinite(n) ? n : 0;
-}
-
-function SummaryPill({ color, label, value }: { color: string; label: string; value: number }) {
-  return (
-    <span
-      style={{
-        display: "inline-flex",
-        alignItems: "center",
-        gap: 6,
-        padding: "3px 10px",
-        borderRadius: 999,
-        fontSize: 13,
-        fontWeight: 600,
-        color: "#fff",
-        background: color,
-      }}
-    >
-      {value} <span style={{ fontWeight: 400, opacity: 0.92 }}>{label}</span>
-    </span>
-  );
-}
-
-function AllocationTable({
-  rows,
-  isLoading,
-  isError,
-  onEdit,
-}: {
-  rows: AllocationRow[];
-  isLoading: boolean;
-  isError: boolean;
-  onEdit?: (r: AllocationRow) => void;
-}) {
-  const editable = Boolean(onEdit);
-  const colCount = editable ? 8 : 7;
-
-  return (
-    <>
-      {isLoading ? <p className="foundations__muted">Loading…</p> : null}
-      {isError ? <p className="foundations__error">Could not load allocations.</p> : null}
-
-      <div className="foundations__table-wrap">
-        <table className="foundations__table">
-          <thead>
-            <tr>
-              <th>Exam date</th>
-              <th>Time</th>
-              <th>Course</th>
-              <th>Dept / Batch / Sec</th>
-              <th>Room</th>
-              <th>Teacher</th>
-              <th>Status</th>
-              {editable ? <th style={{ width: 90 }}>Actions</th> : null}
-            </tr>
-          </thead>
-          <tbody>
-            {rows.length === 0 ? (
-              <tr>
-                <td colSpan={colCount} className="foundations__empty">
-                  {isLoading
-                    ? "Loading…"
-                    : editable
-                      ? "No draft routine yet. Click “Generate routine” to build one."
-                      : "Nothing published yet."}
-                </td>
-              </tr>
-            ) : (
-              rows.map((r) => (
-                <tr key={r.id}>
-                  <td>{fmtDate(r.exam_date)}</td>
-                  <td>
-                    {fmtTime(r.start_time)} - {fmtTime(r.end_time)}
-                  </td>
-                  <td>
-                    <strong>{r.course_code || "—"}</strong>
-                    <div className="foundations__muted" style={{ margin: 0 }}>
-                      {r.course_name}
-                    </div>
-                  </td>
-                  <td>{[r.dept, r.batch, r.section].filter(Boolean).join(" / ") || "—"}</td>
-                  <td>
-                    {r.room_name || "—"}
-                    {r.room_capacity != null ? (
-                      <div className="foundations__muted" style={{ margin: 0 }}>
-                        cap {r.room_capacity}
-                      </div>
-                    ) : null}
-                  </td>
-                  <td>
-                    {r.teacher_name || "—"}
-                    {r.employee_id ? (
-                      <div className="foundations__muted" style={{ margin: 0 }}>
-                        {r.employee_id}
-                      </div>
-                    ) : null}
-                  </td>
-                  <td>
-                    <span className="foundations__badge">{r.status || "—"}</span>
-                  </td>
-                  {editable ? (
-                    <td>
-                      <button
-                        type="button"
-                        className="foundations__icon-btn"
-                        onClick={() => onEdit?.(r)}
-                        aria-label="Reassign allocation"
-                      >
-                        <IconEdit />
-                      </button>
-                    </td>
-                  ) : null}
-                </tr>
-              ))
-            )}
-          </tbody>
-        </table>
-      </div>
-    </>
-  );
-}
+import { AllocationTable } from "@/components/allocations/AllocationTable";
+import { ReassignAllocationModal } from "@/components/allocations/ReassignAllocationModal";
+import {
+  fmtDate,
+  fmtTime,
+  SummaryPill,
+  toCount,
+  type AiSummary,
+  type AllocationTab,
+  type RoomOption,
+} from "@/components/allocations/allocations.helpers";
 
 export function AllocationsPanel() {
-  const [tab, setTab] = useState<Tab>("draft");
+  const [tab, setTab] = useState<AllocationTab>("draft");
 
   const draftQuery = useGetAiAllocationQuery(undefined, { skip: tab !== "draft" });
   const publishedQuery = useGetPublishedAllocationsQuery(undefined, { skip: tab !== "published" });
@@ -182,7 +49,6 @@ export function AllocationsPanel() {
   const draftRows = useMemo(() => mapAllocations(draftQuery.data), [draftQuery.data]);
   const publishedRows = useMemo(() => mapAllocations(publishedQuery.data), [publishedQuery.data]);
 
-  // Post-publish reconciliation: published duties that have gone bad (leave/cancelled/clash/etc.).
   const { data: conflictsRaw = [] } = useGetAllocationConflictsQuery();
   const conflicts = useMemo(
     () =>
@@ -194,7 +60,6 @@ export function AllocationsPanel() {
   );
 
   const rooms = useMemo<RoomOption[]>(() => {
-    // GET /exam-room/rooms is paginated → { data: [...] }; tolerate a bare array too.
     const list = Array.isArray(roomsRaw)
       ? roomsRaw
       : ((roomsRaw as unknown as { data?: unknown[] })?.data ?? []);
@@ -207,13 +72,8 @@ export function AllocationsPanel() {
   }, [roomsRaw]);
 
   const stats = reports?.stats as Record<string, unknown> | undefined;
-
-  // Rows for whichever tab is active — drives the tab-scoped KPIs and "duties per room".
   const activeRows = tab === "draft" ? draftRows : publishedRows;
 
-  // ── Derived stats for the charts ──────────────────────────────────
-  // Coverage is measured in EXAMS (distinct exam ids), not duty-rows — a single exam can have both a
-  // published and a fresh draft allocation row, so raw published_count+draft_count can exceed total_exams.
   const totalExams = toCount(stats?.total_exams);
   const publishedExams = toCount(stats?.published_exams);
   const allocatedExams = toCount(stats?.allocated_exams);
@@ -259,14 +119,12 @@ export function AllocationsPanel() {
   const [triggerAi, { isLoading: generating }] = useTriggerAiAllocationMutation();
   const [publish, { isLoading: publishing }] = usePublishAllocationMutation();
   const [editAllocation, { isLoading: saving }] = useEditAllocationMutation();
-  // Published duties for the export suite (kept subscribed regardless of the active tab).
   const exportQuery = useGetPublishedAllocationsQuery();
   const exportRows = useMemo(() => (exportQuery.data ?? []) as PublishedAllocationRow[], [exportQuery.data]);
   const exportDepts = useMemo(() => deptsOf(exportRows), [exportRows]);
   const [exportDept, setExportDept] = useState("");
   const [searchTeachers, teacherSearch] = useLazyGetTeacherInfoQuery();
 
-  // ── Reassign (manual override) modal ──────────────────────────────
   const [editing, setEditing] = useState<AllocationRow | null>(null);
   const [teacherId, setTeacherId] = useState("");
   const [teacherLabel, setTeacherLabel] = useState("");
@@ -313,7 +171,6 @@ export function AllocationsPanel() {
     }
   };
 
-  // ── Toolbar actions ───────────────────────────────────────────────
   const onGenerate = async () => {
     if (!window.confirm("Generate a fresh DRAFT routine? This replaces any existing draft (published duties are untouched).")) {
       return;
@@ -634,98 +491,25 @@ export function AllocationsPanel() {
         )}
       </div>
 
-      <Modal
-        open={Boolean(editing)}
-        title="Reassign allocation"
+      <ReassignAllocationModal
+        editing={editing}
+        saving={saving}
+        teacherId={teacherId}
+        teacherLabel={teacherLabel}
+        roomId={roomId}
+        searchTerm={searchTerm}
+        formError={formError}
+        rooms={rooms}
+        teacherResults={teacherResults}
+        teacherSearchFetching={teacherSearch.isFetching}
         onClose={closeEdit}
-        footer={
-          <div className="foundations__modal-actions">
-            <button className="foundations__btn foundations__btn--ghost" type="button" onClick={closeEdit}>
-              Cancel
-            </button>
-            <button className="foundations__btn" type="button" disabled={saving} onClick={() => void submitEdit()}>
-              {saving ? "Saving…" : "Save"}
-            </button>
-          </div>
-        }
-      >
-        {editing ? (
-          <div className="foundations__form">
-            <div className="foundations__muted" style={{ marginTop: 0 }}>
-              {editing.course_code} · {fmtDate(editing.exam_date)} · {fmtTime(editing.start_time)}-{fmtTime(editing.end_time)}
-            </div>
-
-            <label className="foundations__field">
-              <span>Teacher</span>
-              <div className="foundations__actions" style={{ width: "100%" }}>
-                <input
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter") {
-                      e.preventDefault();
-                      void onSearchTeachers();
-                    }
-                  }}
-                  placeholder="Search by name, email or employee ID"
-                  style={{ flex: 1 }}
-                />
-                <button
-                  type="button"
-                  className="foundations__btn foundations__btn--ghost"
-                  onClick={() => void onSearchTeachers()}
-                  disabled={teacherSearch.isFetching || !searchTerm.trim()}
-                >
-                  {teacherSearch.isFetching ? "…" : "Search"}
-                </button>
-              </div>
-            </label>
-
-            {teacherResults.length > 0 ? (
-              <label className="foundations__field">
-                <span>Search results</span>
-                <select
-                  value={teacherId}
-                  onChange={(e) => {
-                    const id = e.target.value;
-                    setTeacherId(id);
-                    const found = teacherResults.find((t) => t.id === id);
-                    if (found) setTeacherLabel(found.name);
-                  }}
-                >
-                  <option value="">Select a teacher…</option>
-                  {teacherResults.map((t) => (
-                    <option key={t.id} value={t.id}>
-                      {t.name}
-                      {t.employee_id ? ` (${t.employee_id})` : ""}
-                    </option>
-                  ))}
-                </select>
-              </label>
-            ) : null}
-
-            <div className="foundations__muted" style={{ marginTop: 0 }}>
-              Selected teacher: <strong>{teacherLabel || "—"}</strong>
-            </div>
-
-            <label className="foundations__field">
-              <span>Room</span>
-              <select value={roomId} onChange={(e) => setRoomId(e.target.value)}>
-                <option value="">Select a room…</option>
-                {rooms.map((r) => (
-                  <option key={r.id} value={r.id} disabled={r.is_defect}>
-                    {r.name}
-                    {r.capacity != null ? ` · cap ${r.capacity}` : ""}
-                    {r.is_defect ? " (defect)" : ""}
-                  </option>
-                ))}
-              </select>
-            </label>
-
-            {formError ? <div className="foundations__error">{formError}</div> : null}
-          </div>
-        ) : null}
-      </Modal>
+        onSubmit={() => void submitEdit()}
+        onSearchTermChange={setSearchTerm}
+        onSearchTeachers={() => void onSearchTeachers()}
+        onTeacherIdChange={setTeacherId}
+        onTeacherLabelChange={setTeacherLabel}
+        onRoomIdChange={setRoomId}
+      />
     </div>
   );
 }

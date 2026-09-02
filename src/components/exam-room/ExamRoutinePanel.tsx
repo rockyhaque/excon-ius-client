@@ -1,9 +1,7 @@
-import { Fragment, useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { toast } from "react-toastify";
 import "@/styles/overview.css";
 import "@/styles/foundations.css";
-import { Modal } from "@/components/ui/Modal";
-import { BatchMultiSelect } from "@/components/exam-room/BatchMultiSelect";
 import { ConfirmModal } from "@/components/ui/ConfirmModal";
 import { getErrorMessage } from "@/utils/getErrorMessage";
 import { useGetSemestersQuery, useGetDepartmentsQuery, useGetBatchesQuery } from "@/redux/features/foundations/foundations.api";
@@ -16,155 +14,18 @@ import {
   useDeleteExamMutation,
   useDeleteExamRoutineMutation,
 } from "@/redux/features/exam-room/examRoom.api";
-import { deptsOf, downloadCsv, officialDateLabel, officialExamTitle, officialTableRows, printOfficialRoutine, stampName, timetableCsv } from "@/utils/exports";
-
-const s = (v: unknown) => (v == null ? "" : String(v));
-const arr = (x: unknown): Record<string, unknown>[] => {
-  if (Array.isArray(x)) return x as Record<string, unknown>[];
-  const d = (x as { data?: unknown } | undefined)?.data;
-  return Array.isArray(d) ? (d as Record<string, unknown>[]) : [];
-};
-const fmtBoardDay = (iso: string) => {
-  const dt = new Date(iso + "T00:00:00Z");
-  return isNaN(dt.getTime())
-    ? iso
-    : dt.toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric", timeZone: "UTC" });
-};
-
-type ExamType = "MIDTERM" | "FINAL";
-type ExamRow = {
-  id: string;
-  course_code: string;
-  course_name: string;
-  dept: string;
-  batch: string;
-  section: string;
-  exam_date: string;
-  start_time: string;
-  end_time: string;
-  status: string;
-  exam_type: string;
-  expected_students: number | null;
-  room_id: string;
-  room_name: string;
-  room_building: string;
-  room_capacity: number | null;
-};
-type Semester = { id: string; name: string; season: string; year: string };
-
-const sessionKey = (r: ExamRow) => `${r.start_time.slice(0, 5)}|${r.end_time.slice(0, 5)}`;
-
-/** Drag-and-drop rescheduling board: dates (rows) × sessions (columns). Drag an exam card into
- *  another cell to move it to that date + session. Reschedules flow through updateExam, which
- *  re-notifies the invigilators. */
-function RoutineBoard({
-  rows,
-  onMove,
-  moving,
-}: {
-  rows: ExamRow[];
-  onMove: (examId: string, date: string, st: string, et: string) => void;
-  moving: boolean;
-}) {
-  const [dropTarget, setDropTarget] = useState<string | null>(null);
-  const sessions = useMemo(() => [...new Set(rows.map(sessionKey))].sort(), [rows]);
-  const dates = useMemo(() => [...new Set(rows.map((r) => r.exam_date))].sort(), [rows]);
-
-  const sessionLabel = (sk: string) => {
-    const [st, et] = sk.split("|");
-    return `${st < "12:00" ? "Morning" : "Afternoon"} · ${st}–${et}`;
-  };
-
-  return (
-    <div style={{ overflowX: "auto", paddingBottom: 6 }}>
-      <div
-        style={{
-          display: "grid",
-          gridTemplateColumns: `128px repeat(${sessions.length}, minmax(230px, 1fr))`,
-          gap: 8,
-          minWidth: 128 + sessions.length * 240,
-        }}
-      >
-        <div />
-        {sessions.map((sk) => (
-          <div key={sk} style={{ fontSize: 12, fontWeight: 700, color: "#5c0931", padding: "2px 6px" }}>
-            {sessionLabel(sk)}
-          </div>
-        ))}
-
-        {dates.map((d) => (
-          <Fragment key={d}>
-            <div style={{ fontSize: 13, fontWeight: 600, alignSelf: "start", padding: "10px 4px 0" }}>
-              {fmtBoardDay(d)}
-            </div>
-            {sessions.map((sk) => {
-              const key = `${d}__${sk}`;
-              const [st, et] = sk.split("|");
-              const cellExams = rows.filter((r) => r.exam_date === d && sessionKey(r) === sk);
-              const active = dropTarget === key;
-              return (
-                <div
-                  key={key}
-                  data-cell={key}
-                  onDragOver={(e) => {
-                    e.preventDefault();
-                    if (!active) setDropTarget(key);
-                  }}
-                  onDragLeave={() => setDropTarget((t) => (t === key ? null : t))}
-                  onDrop={(e) => {
-                    e.preventDefault();
-                    setDropTarget(null);
-                    const id = e.dataTransfer.getData("text/plain");
-                    if (id) onMove(id, d, st, et);
-                  }}
-                  style={{
-                    minHeight: 60,
-                    border: `1.5px ${active ? "solid" : "dashed"} ${active ? "#5c0931" : "#e5e7eb"}`,
-                    borderRadius: 10,
-                    background: active ? "#faf0f5" : "#fff",
-                    padding: 6,
-                    display: "flex",
-                    flexDirection: "column",
-                    gap: 6,
-                    opacity: moving ? 0.7 : 1,
-                  }}
-                >
-                  {cellExams.map((r) => (
-                    <div
-                      key={r.id}
-                      data-exam-id={r.id}
-                      draggable
-                      onDragStart={(e) => e.dataTransfer.setData("text/plain", r.id)}
-                      title="Drag to reschedule"
-                      style={{
-                        border: "1px solid #e7cdd9",
-                        background: "#fbf5f8",
-                        borderRadius: 8,
-                        padding: "6px 8px",
-                        cursor: "grab",
-                        fontSize: 12.5,
-                      }}
-                    >
-                      <div style={{ fontWeight: 700, color: "#5c0931" }}>{r.course_code}</div>
-                      <div style={{ color: "#374151" }}>{r.course_name}</div>
-                      <div style={{ color: "#6b7280", marginTop: 2 }}>
-                        B{r.batch}
-                        {r.section ? `-${r.section}` : ""} · {r.room_name || "no room"}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              );
-            })}
-          </Fragment>
-        ))}
-      </div>
-      <p className="foundations__muted" style={{ margin: "10px 2px 0", fontSize: 12.5 }}>
-        Drag an exam card into another session to reschedule it. Assigned invigilators are re-notified automatically.
-      </p>
-    </div>
-  );
-}
+import { deptsOf, downloadCsv, printOfficialRoutine, officialTableRows, stampName, timetableCsv } from "@/utils/exports";
+import { RoutineBoard } from "@/components/exam-room/RoutineBoard";
+import { EditExamModal, GenerateRoutineModal } from "@/components/exam-room/ExamRoutineModals";
+import { OfficialRoutineView } from "@/components/exam-room/OfficialRoutineView";
+import {
+  arr,
+  fmtBoardDay,
+  s,
+  type ExamRow,
+  type ExamType,
+  type Semester,
+} from "@/components/exam-room/examRoutine.types";
 
 export function ExamRoutinePanel() {
   const { data: semRaw } = useGetSemestersQuery();
@@ -237,7 +98,7 @@ export function ExamRoutinePanel() {
         dept,
         rows: officialTableRows(viewRows.filter((r) => r.dept === dept)),
       }))
-      .filter((s) => s.rows.length > 0);
+      .filter((sheet) => sheet.rows.length > 0);
   }, [viewRows, deptFilter]);
 
   const groups = useMemo(() => {
@@ -282,7 +143,7 @@ export function ExamRoutinePanel() {
   const [genOpen, setGenOpen] = useState(false);
   const [genSem, setGenSem] = useState("");
   const [examType, setExamType] = useState<ExamType>("MIDTERM");
-  const [genDept, setGenDept] = useState(""); // "" = all departments
+  const [genDept, setGenDept] = useState("");
   const [selectedBatchIds, setSelectedBatchIds] = useState<Set<string>>(new Set());
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
@@ -359,8 +220,6 @@ export function ExamRoutinePanel() {
     if (!Number.isFinite(studentsPerSection) || studentsPerSection < 1) {
       return setGenError("Students per section must be at least 1.");
     }
-    // Validate the daily slots: each start < end, and no two slots overlap (else a batch could
-    // sit two exams at once). Mirrors the server-side guard so the user gets fast feedback.
     const toMin = (t: string) => {
       const [h, m] = t.split(":").map(Number);
       return (h || 0) * 60 + (m || 0);
@@ -399,8 +258,6 @@ export function ExamRoutinePanel() {
       try {
         res = await doGenerate(false);
       } catch (e: unknown) {
-        // When replacing, the server returns 409 if published invigilation duties would be
-        // cascade-deleted. Surface the count and let the admin confirm the destructive regenerate.
         const status = (e as { status?: number })?.status;
         if (replace && status === 409) {
           const warning = getErrorMessage(e, "Regenerating will delete existing exams and their invigilation duties.");
@@ -539,12 +396,10 @@ export function ExamRoutinePanel() {
     toast.success("Timetable exported.");
   };
 
-  // Drag-and-drop reschedule: move an exam to a new date + session, with client-side clash guards
-  // (a batch can't sit two exams in one session; a hall can't host two exams in one session).
   const handleMove = async (examId: string, date: string, st: string, et: string) => {
     const exam = rows.find((r) => r.id === examId);
     if (!exam) return;
-    if (exam.exam_date === date && exam.start_time.slice(0, 5) === st) return; // dropped on its own cell
+    if (exam.exam_date === date && exam.start_time.slice(0, 5) === st) return;
     const targetCell = rows.filter(
       (r) => r.id !== examId && r.exam_date === date && r.start_time.slice(0, 5) === st && r.end_time.slice(0, 5) === et,
     );
@@ -689,285 +544,71 @@ export function ExamRoutinePanel() {
           {routineView === "board" ? (
             <RoutineBoard rows={viewRows} onMove={handleMove} moving={saving} />
           ) : (
-            <div className="ius-routine-stack">
-              {officialSheets.map((sheet) => {
-                const sem = semesters.find((x) => x.id === semesterId);
-                return (
-                  <article key={sheet.dept} className="ius-sheet">
-                    <header className="ius-sheet__hdr">
-                      <div className="ius-sheet__dept">{sheet.dept}</div>
-                      <div className="ius-sheet__uni">
-                        University of Scholars
-                        <small>The International University of Scholars</small>
-                      </div>
-                    </header>
-                    <h3 className="ius-sheet__title">
-                      {officialExamTitle(viewType || viewRows[0]?.exam_type)}
-                    </h3>
-                    <p className="ius-sheet__sem">Semester: {sem?.name || "—"}</p>
-                    <div className="foundations__table-wrap">
-                      <table className="ius-table">
-                        <thead>
-                          <tr>
-                            <th style={{ width: "18%" }}>Date</th>
-                            <th style={{ width: "16%" }}>Time</th>
-                            <th style={{ width: "16%" }}>Course Code</th>
-                            <th>Course Title</th>
-                            <th style={{ width: "18%" }}>Batch</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {sheet.rows.map((r) => (
-                            <tr key={`${r.date}-${r.start}-${r.course_code}`}>
-                              {r.showDate ? (
-                                <td className="ius-table__date" rowSpan={r.dateSpan}>
-                                  {officialDateLabel(r.date)}
-                                </td>
-                              ) : null}
-                              {r.showTime ? (
-                                <td className="ius-table__time" rowSpan={r.timeSpan}>
-                                  {r.start}–{r.end}
-                                </td>
-                              ) : null}
-                              <td>{r.course_code}</td>
-                              <td>{r.course_name}</td>
-                              <td>{r.batches}</td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  </article>
-                );
-              })}
-            </div>
+            <OfficialRoutineView
+              officialSheets={officialSheets}
+              semesters={semesters}
+              semesterId={semesterId}
+              viewType={viewType}
+              viewRows={viewRows}
+            />
           )}
         </>
       ) : null}
 
-      <Modal
+      <GenerateRoutineModal
         open={genOpen}
-        title="Generate exam routine"
-        width={600}
+        generating={generating}
+        semesters={semesters}
+        genDepartments={genDepartments}
+        runningBatches={runningBatches}
+        genSem={genSem}
+        examType={examType}
+        genDept={genDept}
+        selectedBatchIds={selectedBatchIds}
+        startDate={startDate}
+        endDate={endDate}
+        slots={slots}
+        studentsPerSection={studentsPerSection}
+        skipWeekends={skipWeekends}
+        replace={replace}
+        genError={genError}
         onClose={() => setGenOpen(false)}
-        footer={
-          <div className="foundations__modal-actions">
-            <button className="foundations__btn foundations__btn--ghost" type="button" onClick={() => setGenOpen(false)}>
-              Cancel
-            </button>
-            <button className="foundations__btn" type="button" disabled={generating} onClick={() => void submitGenerate()}>
-              {generating ? "Generating…" : "Generate"}
-            </button>
-          </div>
-        }
-      >
-        <div className="foundations__form">
-          <label className="foundations__field">
-            <span>Semester</span>
-            <select value={genSem} onChange={(e) => setGenSem(e.target.value)}>
-              {semesters.length === 0 ? <option value="">No semesters yet</option> : null}
-              {semesters.map((sm) => (
-                <option key={sm.id} value={sm.id}>
-                  {sm.name} ({sm.season})
-                </option>
-              ))}
-            </select>
-          </label>
-          {semesters.length === 0 ? (
-            <p className="foundations__muted" style={{ margin: "-4px 0 0" }}>
-              No semesters yet — create one in <strong>Foundations → Semesters</strong>, then it will appear here.
-            </p>
-          ) : null}
+        onSubmit={() => void submitGenerate()}
+        onGenSemChange={setGenSem}
+        onExamTypeChange={setExamType}
+        onGenDeptChange={setGenDept}
+        onToggleBatch={toggleBatch}
+        onSetManyBatches={setManyBatches}
+        onStartDateChange={setStartDate}
+        onEndDateChange={setEndDate}
+        onUpdateSlot={updateSlot}
+        onAddSlot={addSlot}
+        onRemoveSlot={removeSlot}
+        onStudentsPerSectionChange={setStudentsPerSection}
+        onSkipWeekendsChange={setSkipWeekends}
+        onReplaceChange={setReplace}
+      />
 
-          <label className="foundations__field">
-            <span>Exam type</span>
-            <select value={examType} onChange={(e) => setExamType(e.target.value as ExamType)}>
-              <option value="MIDTERM">Midterm</option>
-              <option value="FINAL">Final</option>
-            </select>
-          </label>
-
-          <label className="foundations__field">
-            <span>Department</span>
-            <select value={genDept} onChange={(e) => setGenDept(e.target.value)}>
-              <option value="">All departments</option>
-              {genDepartments.map((d) => (
-                <option key={d.id} value={d.id}>
-                  {d.name}
-                </option>
-              ))}
-            </select>
-          </label>
-
-          <div className="foundations__field">
-            <span>Batches</span>
-            {runningBatches.length === 0 ? (
-              <p className="foundations__muted" style={{ margin: 0 }}>
-                No running batches{genDept ? " in this department" : ""} — completed batches don't sit exams. Add or resume
-                batches in <strong>Foundations → Batches</strong>.
-              </p>
-            ) : (
-              <>
-                <BatchMultiSelect
-                  batches={runningBatches}
-                  departments={genDepartments}
-                  groupByDept={!genDept && genDepartments.length > 0}
-                  selected={selectedBatchIds}
-                  onToggle={toggleBatch}
-                  onSetMany={setManyBatches}
-                />
-                <span className="foundations__muted" style={{ margin: "6px 0 0", fontSize: 12.5 }}>
-                  Only running batches are shown — completed batches don't sit exams.
-                </span>
-              </>
-            )}
-          </div>
-
-          <label className="foundations__field">
-            <span>Start date</span>
-            <input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} />
-          </label>
-          <label className="foundations__field">
-            <span>End date</span>
-            <input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} />
-          </label>
-          <div className="foundations__field">
-            <span>Daily time slots</span>
-            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-              {slots.map((sl, i) => (
-                <div key={i} style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                  <input type="time" value={sl.start} onChange={(e) => updateSlot(i, "start", e.target.value)} />
-                  <span className="foundations__muted" style={{ margin: 0 }}>to</span>
-                  <input type="time" value={sl.end} onChange={(e) => updateSlot(i, "end", e.target.value)} />
-                  <button
-                    type="button"
-                    className="foundations__btn foundations__btn--ghost"
-                    style={{ padding: "6px 10px" }}
-                    onClick={() => removeSlot(i)}
-                    disabled={slots.length === 1}
-                    aria-label={`Remove slot ${i + 1}`}
-                  >
-                    Remove
-                  </button>
-                </div>
-              ))}
-              <button
-                type="button"
-                className="foundations__btn foundations__btn--ghost"
-                style={{ alignSelf: "flex-start", padding: "6px 10px" }}
-                onClick={addSlot}
-              >
-                + Add slot
-              </button>
-            </div>
-          </div>
-          <p className="foundations__muted" style={{ margin: 0 }}>
-            Add a second slot (e.g. an afternoon session) to schedule more exams per day. Slots must not overlap.
-          </p>
-          <label className="foundations__field">
-            <span>Students per section (for room seating)</span>
-            <input
-              type="number"
-              min={1}
-              value={studentsPerSection}
-              onChange={(e) => setStudentsPerSection(Number(e.target.value))}
-            />
-          </label>
-
-          <p className="foundations__muted" style={{ margin: 0 }}>
-            Rooms are seated by capacity automatically. Teacher invigilation stays in Allocations — not mixed here.
-          </p>
-
-          <label style={{ display: "flex", alignItems: "center", gap: 10 }}>
-            <input type="checkbox" checked={skipWeekends} onChange={(e) => setSkipWeekends(e.target.checked)} />
-            <span className="foundations__muted" style={{ margin: 0 }}>
-              Skip weekends (Friday &amp; Saturday)
-            </span>
-          </label>
-          <label style={{ display: "flex", alignItems: "center", gap: 10 }}>
-            <input type="checkbox" checked={replace} onChange={(e) => setReplace(e.target.checked)} />
-            <span className="foundations__muted" style={{ margin: 0 }}>
-              Replace existing {examType} exams for the selected {selectedBatchIds.size === 1 ? "batch" : "batches"}
-            </span>
-          </label>
-
-          {genError ? <div className="foundations__error">{genError}</div> : null}
-        </div>
-      </Modal>
-
-      <Modal
-        open={Boolean(editing)}
-        title="Edit exam"
+      <EditExamModal
+        editing={editing}
+        saving={saving}
+        eDate={eDate}
+        eStart={eStart}
+        eEnd={eEnd}
+        eStatus={eStatus}
+        eStudents={eStudents}
+        eRoomId={eRoomId}
+        editError={editError}
+        roomOptions={roomOptions}
         onClose={() => setEditing(null)}
-        footer={
-          <div className="foundations__modal-actions">
-            <button className="foundations__btn foundations__btn--ghost" type="button" onClick={() => setEditing(null)}>
-              Cancel
-            </button>
-            <button className="foundations__btn" type="button" disabled={saving} onClick={() => void submitEdit()}>
-              {saving ? "Saving…" : "Save"}
-            </button>
-          </div>
-        }
-      >
-        {editing ? (
-          <div className="foundations__form">
-            <div className="foundations__muted" style={{ marginTop: 0 }}>
-              {editing.course_code} · {editing.dept} · B{editing.batch}
-              {editing.section ? `-${editing.section}` : ""} · {editing.exam_type || "—"}
-              {editing.room_name ? ` · ${editing.room_name}` : ""}
-            </div>
-            <label className="foundations__field">
-              <span>Exam date</span>
-              <input type="date" value={eDate} onChange={(e) => setEDate(e.target.value)} />
-            </label>
-            <label className="foundations__field">
-              <span>Start time</span>
-              <input type="time" value={eStart} onChange={(e) => setEStart(e.target.value)} />
-            </label>
-            <label className="foundations__field">
-              <span>End time</span>
-              <input type="time" value={eEnd} onChange={(e) => setEEnd(e.target.value)} />
-            </label>
-            <label className="foundations__field">
-              <span>Status</span>
-              <select value={eStatus} onChange={(e) => setEStatus(e.target.value)}>
-                <option value="SCHEDULED">Scheduled</option>
-                <option value="RESCHEDULED">Rescheduled</option>
-                <option value="PENDING">Pending</option>
-                <option value="CANCELLED">Cancelled</option>
-              </select>
-            </label>
-            <label className="foundations__field">
-              <span>Expected students (actual headcount for seating)</span>
-              <input
-                type="number"
-                min={0}
-                value={eStudents}
-                onChange={(e) => setEStudents(e.target.value === "" ? "" : Number(e.target.value))}
-                placeholder="e.g. 38"
-              />
-            </label>
-            <label className="foundations__field">
-              <span>Seating room</span>
-              <select value={eRoomId} onChange={(e) => setERoomId(e.target.value)}>
-                <option value="">— No room —</option>
-                {roomOptions.map((r) => {
-                  const over = eStudents !== "" && r.capacity != null && Number(eStudents) > r.capacity;
-                  return (
-                    <option key={r.id} value={r.id}>
-                      {r.name}
-                      {r.capacity != null ? ` (cap ${r.capacity})` : ""}
-                      {over ? " — over capacity" : ""}
-                    </option>
-                  );
-                })}
-              </select>
-            </label>
-            {editError ? <div className="foundations__error">{editError}</div> : null}
-          </div>
-        ) : null}
-      </Modal>
+        onSubmit={() => void submitEdit()}
+        onEDateChange={setEDate}
+        onEStartChange={setEStart}
+        onEEndChange={setEEnd}
+        onEStatusChange={setEStatus}
+        onEStudentsChange={setEStudents}
+        onERoomIdChange={setERoomId}
+      />
 
       <ConfirmModal
         open={Boolean(pendingDelete)}

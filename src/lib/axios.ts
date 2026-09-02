@@ -4,7 +4,7 @@ import { getAccessToken, setAccessToken } from "@/lib/authToken";
 
 export const axiosInstance = axios.create({
   baseURL: config.baseUrl,
-  withCredentials: true, // needed for refreshToken cookie
+  withCredentials: true,  // needed for refreshToken cookie
 });
 
 axiosInstance.interceptors.request.use(
