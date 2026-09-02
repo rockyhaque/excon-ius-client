@@ -249,6 +249,7 @@ export type OfficialExamInput = {
   end_time?: string | null;
   exam_type?: string | null;
   status?: string | null;
+  invigilators?: string | null;
 };
 
 export type OfficialSitting = {
@@ -259,6 +260,7 @@ export type OfficialSitting = {
   course_name: string;
   batches: string;
   exam_ids: string[];
+  invigilators: string;
 };
 
 export type OfficialTableRow = OfficialSitting & {
@@ -317,7 +319,14 @@ export function officialExamTitle(examType?: string | null): string {
 
 /** Collapse section sittings of the same course in the same slot into one row. */
 export function groupOfficialSittings(exams: OfficialExamInput[]): OfficialSitting[] {
-  const map = new Map<string, { row: OfficialSitting; nums: string[] }>();
+  const map = new Map<string, { row: OfficialSitting; nums: string[]; invs: Set<string> }>();
+  const addInvs = (set: Set<string>, raw: string | null | undefined) => {
+    String(raw ?? "")
+      .split(",")
+      .map((n) => n.trim())
+      .filter(Boolean)
+      .forEach((n) => set.add(n));
+  };
   for (const e of exams) {
     if (String(e.status ?? "").toUpperCase() === "CANCELLED") continue;
     const date = String(e.exam_date ?? "").slice(0, 10);
@@ -331,9 +340,13 @@ export function groupOfficialSittings(exams: OfficialExamInput[]): OfficialSitti
     if (existing) {
       if (e.id) existing.row.exam_ids.push(String(e.id));
       if (batch) existing.nums.push(batch);
+      addInvs(existing.invs, e.invigilators);
     } else {
+      const invs = new Set<string>();
+      addInvs(invs, e.invigilators);
       map.set(key, {
         nums: batch ? [batch] : [],
+        invs,
         row: {
           date,
           start,
@@ -342,12 +355,13 @@ export function groupOfficialSittings(exams: OfficialExamInput[]): OfficialSitti
           course_name: String(e.course_name ?? "").trim(),
           batches: "",
           exam_ids: e.id ? [String(e.id)] : [],
+          invigilators: "",
         },
       });
     }
   }
   return [...map.values()]
-    .map(({ row, nums }) => ({ ...row, batches: formatBatchList(nums) }))
+    .map(({ row, nums, invs }) => ({ ...row, batches: formatBatchList(nums), invigilators: [...invs].sort().join(", ") }))
     .sort(
       (a, b) =>
         a.date.localeCompare(b.date) ||

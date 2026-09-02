@@ -81,6 +81,7 @@ export function ExamRoutinePanel() {
         room_name: s(e.room_name),
         room_building: s(e.room_building),
         room_capacity: e.room_capacity == null ? null : Number(e.room_capacity),
+        invigilators: s(e.invigilators),
       })),
     [examsRaw],
   );

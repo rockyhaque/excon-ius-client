@@ -42,7 +42,8 @@ export function OfficialRoutineView({
                     <th style={{ width: "16%" }}>Time</th>
                     <th style={{ width: "16%" }}>Course Code</th>
                     <th>Course Title</th>
-                    <th style={{ width: "18%" }}>Batch</th>
+                    <th style={{ width: "14%" }}>Batch</th>
+                    <th style={{ width: "18%" }}>Invigilator(s)</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -61,6 +62,7 @@ export function OfficialRoutineView({
                       <td>{r.course_code}</td>
                       <td>{r.course_name}</td>
                       <td>{r.batches}</td>
+                      <td>{r.invigilators || "—"}</td>
                     </tr>
                   ))}
                 </tbody>
