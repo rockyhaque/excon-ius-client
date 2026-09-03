@@ -17,7 +17,6 @@ export type ExamRow = {
   room_name: string;
   room_building: string;
   room_capacity: number | null;
-  invigilators: string;
 };
 
 export type Semester = { id: string; name: string; season: string; year: string };
