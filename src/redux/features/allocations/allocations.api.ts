@@ -31,6 +31,10 @@ export const allocationsApi = baseApi.injectEndpoints({
       query: () => ({ url: "/allocations/publish", method: "POST" }),
       invalidatesTags: ["ALLOCATIONS"],
     }),
+    clearDraftAllocation: builder.mutation<{ message: string; cleared: number }, void>({
+      query: () => ({ url: "/allocations/clear-draft", method: "POST" }),
+      invalidatesTags: ["ALLOCATIONS"],
+    }),
     emergencyReallocate: builder.mutation<{ message: string }, { teacher_id: string }>({
       query: (data) => ({ url: "/allocations/emergency-reallocate", method: "POST", data }),
       invalidatesTags: ["ALLOCATIONS", "USERS"],
@@ -86,6 +90,7 @@ export const {
   useGetAiAllocationQuery,
   useEditAllocationMutation,
   usePublishAllocationMutation,
+  useClearDraftAllocationMutation,
   useEmergencyReallocateMutation,
   useGetAllocationReportsQuery,
   useLazyExportAllocationReportQuery,

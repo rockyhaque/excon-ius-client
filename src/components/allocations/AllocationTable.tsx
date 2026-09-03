@@ -61,10 +61,12 @@ export function AllocationTable({
                   </td>
                   <td>{[r.dept, r.batch, r.section].filter(Boolean).join(" / ") || "—"}</td>
                   <td>
-                    {r.room_name || "—"}
-                    {r.room_capacity != null ? (
+                    <strong>{r.room_name || "—"}</strong>
+                    {r.room_building || r.room_capacity != null ? (
                       <div className="foundations__muted" style={{ margin: 0 }}>
-                        cap {r.room_capacity}
+                        {[r.room_building, r.room_capacity != null ? `cap ${r.room_capacity}` : ""]
+                          .filter(Boolean)
+                          .join(" · ")}
                       </div>
                     ) : null}
                   </td>

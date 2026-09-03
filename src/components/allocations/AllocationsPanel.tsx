@@ -12,6 +12,7 @@ import {
   useGetPublishedAllocationsQuery,
   useLazyGetTeacherInfoQuery,
   usePublishAllocationMutation,
+  useClearDraftAllocationMutation,
   useTriggerAiAllocationMutation,
 } from "@/redux/features/allocations/allocations.api";
 import { useGetRoomsQuery } from "@/redux/features/exam-room/examRoom.api";
@@ -118,6 +119,7 @@ export function AllocationsPanel() {
 
   const [triggerAi, { isLoading: generating }] = useTriggerAiAllocationMutation();
   const [publish, { isLoading: publishing }] = usePublishAllocationMutation();
+  const [clearDraft, { isLoading: clearing }] = useClearDraftAllocationMutation();
   const [editAllocation, { isLoading: saving }] = useEditAllocationMutation();
   const exportQuery = useGetPublishedAllocationsQuery();
   const exportRows = useMemo(() => (exportQuery.data ?? []) as PublishedAllocationRow[], [exportQuery.data]);
@@ -218,6 +220,21 @@ export function AllocationsPanel() {
       setTab("published");
     } catch (e: unknown) {
       toast.error(getErrorMessage(e, "Could not publish allocation."));
+    }
+  };
+
+  const onClearDraft = async () => {
+    if (draftRows.length === 0) {
+      toast.info("No draft routine to clear.");
+      return;
+    }
+    if (!window.confirm("Clear the draft routine? All draft duties are removed. Published duties are kept.")) return;
+    try {
+      const res = (await clearDraft().unwrap()) as { message?: string };
+      toast.success(res.message ?? "Draft cleared.");
+      setTab("draft");
+    } catch (e: unknown) {
+      toast.error(getErrorMessage(e, "Could not clear the draft."));
     }
   };
 
@@ -451,6 +468,14 @@ export function AllocationsPanel() {
           <div className="foundations__toolbar-right">
             <button className="foundations__btn foundations__btn--ghost" type="button" onClick={() => void onGenerate()} disabled={generating}>
               {generating ? "Generating…" : "Generate routine"}
+            </button>
+            <button
+              className="foundations__btn foundations__btn--ghost"
+              type="button"
+              onClick={() => void onClearDraft()}
+              disabled={clearing || generating}
+            >
+              {clearing ? "Clearing…" : "Clear draft"}
             </button>
             <button className="foundations__btn" type="button" onClick={() => void onPublish()} disabled={publishing || generating}>
               {publishing ? "Publishing…" : "Publish"}

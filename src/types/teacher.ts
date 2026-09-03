@@ -54,6 +54,7 @@ export type PublishedAllocationRow = {
   expected_students?: number | null;
   room_name: string;
   room_capacity?: number | null;
+  room_building?: string | null;
   teacher_name: string;
   employee_id?: string | null;
   teacher_email?: string | null;

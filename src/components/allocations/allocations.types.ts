@@ -19,6 +19,7 @@ export type AllocationRow = {
   expected_students: number | null;
   room_name: string;
   room_capacity: number | null;
+  room_building: string | null;
   teacher_name: string;
   employee_id: string | null;
   designation: string | null;
@@ -93,6 +94,7 @@ export function mapAllocations(rows: unknown): AllocationRow[] {
     expected_students: numOrNull(a.expected_students),
     room_name: str(a.room_name),
     room_capacity: numOrNull(a.room_capacity),
+    room_building: a.room_building == null ? null : str(a.room_building),
     teacher_name: str(a.teacher_name),
     employee_id: a.employee_id == null ? null : str(a.employee_id),
     designation: a.designation == null ? null : str(a.designation),
