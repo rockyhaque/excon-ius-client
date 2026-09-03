@@ -154,7 +154,14 @@ export function ExamRoutinePanel() {
     setSlots((prev) => prev.map((sl, idx) => (idx === i ? { ...sl, [field]: val } : sl)));
   const addSlot = () => setSlots((prev) => [...prev, { start: "14:00", end: "17:00" }]);
   const removeSlot = (i: number) => setSlots((prev) => (prev.length > 1 ? prev.filter((_, idx) => idx !== i) : prev));
-  const [skipWeekends, setSkipWeekends] = useState(true);
+  const [skipDays, setSkipDays] = useState<Set<number>>(new Set([5, 6])); // Fri, Sat by default
+  const toggleSkipDay = (d: number) =>
+    setSkipDays((prev) => {
+      const next = new Set(prev);
+      if (next.has(d)) next.delete(d);
+      else next.add(d);
+      return next;
+    });
   const [replace, setReplace] = useState(false);
   const [genError, setGenError] = useState<string | null>(null);
 
@@ -201,7 +208,7 @@ export function ExamRoutinePanel() {
     setEndDate("");
     setSlots([{ start: "09:00", end: "12:00" }]);
     setStudentsPerSection(40);
-    setSkipWeekends(true);
+    setSkipDays(new Set([5, 6]));
     setReplace(false);
     setGenError(null);
     setGenOpen(true);
@@ -246,7 +253,7 @@ export function ExamRoutinePanel() {
           start_date: startDate,
           end_date: endDate,
           slots: sortedSlots.map((sl) => ({ start_time: sl.start, end_time: sl.end })),
-          skip_weekends: skipWeekends,
+          skip_days: [...skipDays],
           replace,
           ...(confirmReplace ? { confirm_replace: true } : {}),
           ...(genDept ? { dept_id: genDept } : {}),
@@ -569,7 +576,7 @@ export function ExamRoutinePanel() {
         endDate={endDate}
         slots={slots}
         studentsPerSection={studentsPerSection}
-        skipWeekends={skipWeekends}
+        skipDays={skipDays}
         replace={replace}
         genError={genError}
         onClose={() => setGenOpen(false)}
@@ -585,7 +592,7 @@ export function ExamRoutinePanel() {
         onAddSlot={addSlot}
         onRemoveSlot={removeSlot}
         onStudentsPerSectionChange={setStudentsPerSection}
-        onSkipWeekendsChange={setSkipWeekends}
+        onToggleSkipDay={toggleSkipDay}
         onReplaceChange={setReplace}
       />
 

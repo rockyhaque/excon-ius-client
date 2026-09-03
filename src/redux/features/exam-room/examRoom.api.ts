@@ -21,6 +21,7 @@ export const examRoomApi = baseApi.injectEndpoints({
         /** One or more non-overlapping daily slots (morning, afternoon, …). */
         slots?: { start_time: string; end_time: string }[];
         skip_weekends?: boolean;
+        skip_days?: number[];
         replace?: boolean;
         /** Acknowledge that replacing will delete already-published invigilation duties. */
         confirm_replace?: boolean;

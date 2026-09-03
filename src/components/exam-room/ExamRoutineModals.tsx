@@ -19,7 +19,7 @@ export function GenerateRoutineModal({
   endDate,
   slots,
   studentsPerSection,
-  skipWeekends,
+  skipDays,
   replace,
   genError,
   onClose,
@@ -35,7 +35,7 @@ export function GenerateRoutineModal({
   onAddSlot,
   onRemoveSlot,
   onStudentsPerSectionChange,
-  onSkipWeekendsChange,
+  onToggleSkipDay,
   onReplaceChange,
 }: {
   open: boolean;
@@ -51,7 +51,7 @@ export function GenerateRoutineModal({
   endDate: string;
   slots: TimeSlot[];
   studentsPerSection: number;
-  skipWeekends: boolean;
+  skipDays: Set<number>;
   replace: boolean;
   genError: string | null;
   onClose: () => void;
@@ -67,7 +67,7 @@ export function GenerateRoutineModal({
   onAddSlot: () => void;
   onRemoveSlot: (index: number) => void;
   onStudentsPerSectionChange: (value: number) => void;
-  onSkipWeekendsChange: (value: boolean) => void;
+  onToggleSkipDay: (day: number) => void;
   onReplaceChange: (value: boolean) => void;
 }) {
   return (
@@ -206,12 +206,20 @@ export function GenerateRoutineModal({
           Rooms are seated by capacity automatically. Teacher invigilation stays in Allocations — not mixed here.
         </p>
 
-        <label style={{ display: "flex", alignItems: "center", gap: 10 }}>
-          <input type="checkbox" checked={skipWeekends} onChange={(e) => onSkipWeekendsChange(e.target.checked)} />
-          <span className="foundations__muted" style={{ margin: 0 }}>
-            Skip weekends (Friday &amp; Saturday)
+        <div className="foundations__field">
+          <span>Skip these days</span>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 14, marginTop: 2 }}>
+            {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((lbl, i) => (
+              <label key={lbl} style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                <input type="checkbox" checked={skipDays.has(i)} onChange={() => onToggleSkipDay(i)} />
+                <span>{lbl}</span>
+              </label>
+            ))}
+          </div>
+          <span className="foundations__muted" style={{ margin: "2px 0 0", fontSize: 12.5 }}>
+            Checked days are skipped — no exams are scheduled on them.
           </span>
-        </label>
+        </div>
         <label style={{ display: "flex", alignItems: "center", gap: 10 }}>
           <input type="checkbox" checked={replace} onChange={(e) => onReplaceChange(e.target.checked)} />
           <span className="foundations__muted" style={{ margin: 0 }}>
