@@ -18,6 +18,7 @@ import { deptsOf, downloadCsv, printOfficialRoutine, officialTableRows, stampNam
 import { RoutineBoard } from "@/components/exam-room/RoutineBoard";
 import { EditExamModal, GenerateRoutineModal } from "@/components/exam-room/ExamRoutineModals";
 import { OfficialRoutineView } from "@/components/exam-room/OfficialRoutineView";
+import { RoomSeatingModal } from "@/components/exam-room/RoomSeatingModal";
 import {
   arr,
   fmtBoardDay,
@@ -47,6 +48,7 @@ export function ExamRoutinePanel() {
   const [viewType, setViewType] = useState<ExamType | "">("");
   const [deptFilter, setDeptFilter] = useState("");
   const [routineView, setRoutineView] = useState<"list" | "board">("list");
+  const [seatingModalOpen, setSeatingModalOpen] = useState(false);
 
   useEffect(() => {
     if (!semesterId && semesters.length > 0) {
@@ -164,6 +166,7 @@ export function ExamRoutinePanel() {
     });
   const [replace, setReplace] = useState(false);
   const [genError, setGenError] = useState<string | null>(null);
+  const [pendingRegenWarning, setPendingRegenWarning] = useState<string | null>(null);
 
   const genBatches = useMemo(
     () => {
@@ -268,15 +271,43 @@ export function ExamRoutinePanel() {
         const status = (e as { status?: number })?.status;
         if (replace && status === 409) {
           const warning = getErrorMessage(e, "Regenerating will delete existing exams and their invigilation duties.");
-          if (!window.confirm(`${warning}\n\nDelete them and regenerate?`)) {
-            setGenError("Regeneration cancelled — nothing was changed.");
-            return;
-          }
-          res = await doGenerate(true);
+          setPendingRegenWarning(warning);
+          return;
         } else {
           throw e;
         }
       }
+
+      setSemesterId(sid);
+      setViewType(examType);
+      setGenOpen(false);
+      toast.success(res.message ?? "Exam routine generated.");
+    } catch (e: unknown) {
+      const msg = getErrorMessage(e, "Could not generate routine.");
+      setGenError(msg);
+      toast.error(msg);
+    }
+  };
+
+  const confirmRegenerate = async () => {
+    setPendingRegenWarning(null);
+    const sid = genSem;
+    if (!sid) return;
+    const sortedSlots = [...slots].sort((a, b) => a.start.localeCompare(b.start));
+    try {
+      const res = await generate({
+        semester_id: sid,
+        exam_type: examType,
+        start_date: startDate,
+        end_date: endDate,
+        slots: sortedSlots.map((sl) => ({ start_time: sl.start, end_time: sl.end })),
+        skip_days: [...skipDays],
+        replace: true,
+        confirm_replace: true,
+        ...(genDept ? { dept_id: genDept } : {}),
+        batch_ids: [...selectedBatchIds],
+        students_per_section: studentsPerSection,
+      }).unwrap();
 
       setSemesterId(sid);
       setViewType(examType);
@@ -495,6 +526,15 @@ export function ExamRoutinePanel() {
           <button className="foundations__btn foundations__btn--ghost" type="button" onClick={exportCsv} disabled={viewRows.length === 0}>
             Export CSV
           </button>
+          <button
+            className="foundations__btn foundations__btn--ghost"
+            type="button"
+            onClick={() => setSeatingModalOpen(true)}
+            disabled={rows.length === 0}
+            style={{ fontWeight: 600, color: "#2563eb", borderColor: "#bfdbfe" }}
+          >
+            Seating Plan (Columns)
+          </button>
           <button className="foundations__btn" type="button" onClick={openGenerate} disabled={generating}>
             {generating ? "Generating…" : "Generate routine"}
           </button>
@@ -633,6 +673,23 @@ export function ExamRoutinePanel() {
         busy={deletingRoutine}
         onClose={() => setPendingDeleteRoutine(false)}
         onConfirm={() => void confirmDeleteRoutine()}
+      />
+      <ConfirmModal
+        open={Boolean(pendingRegenWarning)}
+        title="Replace Existing Routine?"
+        message={`${pendingRegenWarning ?? ""}\n\nDelete them and regenerate?`}
+        confirmLabel="Replace & Regenerate"
+        busy={generating}
+        onClose={() => {
+          setPendingRegenWarning(null);
+          setGenError("Regeneration cancelled — nothing was changed.");
+        }}
+        onConfirm={() => void confirmRegenerate()}
+      />
+      <RoomSeatingModal
+        open={seatingModalOpen}
+        onClose={() => setSeatingModalOpen(false)}
+        semesterId={semesterId}
       />
     </>
   );

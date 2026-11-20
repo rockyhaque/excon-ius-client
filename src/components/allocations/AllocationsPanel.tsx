@@ -29,6 +29,7 @@ import {
 } from "@/utils/exports";
 import { AllocationTable } from "@/components/allocations/AllocationTable";
 import { ReassignAllocationModal } from "@/components/allocations/ReassignAllocationModal";
+import { ConfirmModal } from "@/components/ui/ConfirmModal";
 import {
   fmtDate,
   fmtTime,
@@ -133,6 +134,7 @@ export function AllocationsPanel() {
   const [roomId, setRoomId] = useState("");
   const [searchTerm, setSearchTerm] = useState("");
   const [formError, setFormError] = useState<string | null>(null);
+  const [confirmAction, setConfirmAction] = useState<"generate" | "publish" | "clear" | null>(null);
 
   const openEdit = (r: AllocationRow) => {
     setEditing(r);
@@ -173,10 +175,7 @@ export function AllocationsPanel() {
     }
   };
 
-  const onGenerate = async () => {
-    if (!window.confirm("Generate a fresh DRAFT routine? This replaces any existing draft (published duties are untouched).")) {
-      return;
-    }
+  const executeGenerate = async () => {
     try {
       const res = (await triggerAi().unwrap()) as {
         message?: string;
@@ -208,12 +207,7 @@ export function AllocationsPanel() {
     }
   };
 
-  const onPublish = async () => {
-    if (draftRows.length === 0) {
-      toast.info("No draft routine to publish. Generate one first.");
-      return;
-    }
-    if (!window.confirm("Publish the draft routine? Assigned teachers will be notified by email.")) return;
+  const executePublish = async () => {
     try {
       const res = (await publish().unwrap()) as { message?: string };
       toast.success(res.message ?? "Allocation published.");
@@ -223,12 +217,7 @@ export function AllocationsPanel() {
     }
   };
 
-  const onClearDraft = async () => {
-    if (draftRows.length === 0) {
-      toast.info("No draft routine to clear.");
-      return;
-    }
-    if (!window.confirm("Clear the draft routine? All draft duties are removed. Published duties are kept.")) return;
+  const executeClearDraft = async () => {
     try {
       const res = (await clearDraft().unwrap()) as { message?: string };
       toast.success(res.message ?? "Draft cleared.");
@@ -236,6 +225,14 @@ export function AllocationsPanel() {
     } catch (e: unknown) {
       toast.error(getErrorMessage(e, "Could not clear the draft."));
     }
+  };
+
+  const onConfirmAction = async () => {
+    const act = confirmAction;
+    setConfirmAction(null);
+    if (act === "generate") await executeGenerate();
+    else if (act === "publish") await executePublish();
+    else if (act === "clear") await executeClearDraft();
   };
 
   const noRowsToast = () => toast.info("No published duties to export yet. Publish the routine first.");
@@ -466,18 +463,34 @@ export function AllocationsPanel() {
             </span>
           </div>
           <div className="foundations__toolbar-right">
-            <button className="foundations__btn foundations__btn--ghost" type="button" onClick={() => void onGenerate()} disabled={generating}>
+            <button
+              className="foundations__btn foundations__btn--ghost"
+              type="button"
+              onClick={() => setConfirmAction("generate")}
+              disabled={generating || publishing || clearing}
+            >
               {generating ? "Generating…" : "Generate routine"}
             </button>
             <button
               className="foundations__btn foundations__btn--ghost"
               type="button"
-              onClick={() => void onClearDraft()}
-              disabled={clearing || generating}
+              onClick={() => {
+                if (draftRows.length === 0) return toast.info("No draft routine to clear.");
+                setConfirmAction("clear");
+              }}
+              disabled={clearing || generating || draftRows.length === 0}
             >
               {clearing ? "Clearing…" : "Clear draft"}
             </button>
-            <button className="foundations__btn" type="button" onClick={() => void onPublish()} disabled={publishing || generating}>
+            <button
+              className="foundations__btn"
+              type="button"
+              onClick={() => {
+                if (draftRows.length === 0) return toast.info("No draft routine to publish. Generate one first.");
+                setConfirmAction("publish");
+              }}
+              disabled={publishing || generating || draftRows.length === 0}
+            >
               {publishing ? "Publishing…" : "Publish"}
             </button>
           </div>
@@ -534,6 +547,34 @@ export function AllocationsPanel() {
         onTeacherIdChange={setTeacherId}
         onTeacherLabelChange={setTeacherLabel}
         onRoomIdChange={setRoomId}
+      />
+
+      <ConfirmModal
+        open={Boolean(confirmAction)}
+        title={
+          confirmAction === "generate"
+            ? "Generate Draft Routine"
+            : confirmAction === "publish"
+            ? "Publish Routine"
+            : "Clear Draft Routine"
+        }
+        message={
+          confirmAction === "generate"
+            ? "Generate a fresh DRAFT routine? This replaces any existing draft (published duties remain untouched)."
+            : confirmAction === "publish"
+            ? "Publish the draft routine? Assigned teachers will be notified by email."
+            : "Clear the draft routine? All draft duties will be removed. Published duties are kept."
+        }
+        confirmLabel={
+          confirmAction === "generate"
+            ? "Generate"
+            : confirmAction === "publish"
+            ? "Publish"
+            : "Clear Draft"
+        }
+        busy={generating || publishing || clearing}
+        onClose={() => setConfirmAction(null)}
+        onConfirm={() => void onConfirmAction()}
       />
     </div>
   );

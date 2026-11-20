@@ -583,3 +583,130 @@ export function allocationCsv(rows: PublishedAllocationRow[], opts: { dept?: str
 /** A dated filename stamp, e.g. IUS_Duty_Slips_2026-08-15.csv */
 export const stampName = (base: string, ext: string): string =>
   `IUS_${base}_${new Date().toISOString().slice(0, 10)}.${ext}`;
+
+// ── Classroom Door Notices (Column Seating Plan PDF) ────────────────────────
+const DOOR_NOTICE_STYLES = `
+  * { box-sizing: border-box; }
+  html, body { background: #fff; }
+  body { font-family: "Segoe UI", Arial, sans-serif; color: #111; padding: 20px; }
+  .door-sheet { page-break-after: always; padding: 10px 0; min-height: 90vh; display: flex; flex-direction: column; }
+  .door-sheet:last-child { page-break-after: auto; }
+  .hdr { display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 2px solid #5c0931; padding-bottom: 8px; margin-bottom: 12px; }
+  .hdr-left { font-size: 13px; font-weight: 700; color: #111; }
+  .hdr-right { text-align: right; font-weight: 700; font-size: 15px; color: #5c0931; }
+  .hdr-right small { display: block; font-weight: 400; font-size: 11px; color: #555; }
+  .title-bar { text-align: center; margin: 10px 0 16px; }
+  .title-bar h1 { font-size: 20px; margin: 0; color: #5c0931; text-transform: uppercase; letter-spacing: 0.5px; }
+  .title-bar .subtitle { font-size: 13px; color: #4b5563; margin-top: 4px; }
+  .meta-box { display: flex; justify-content: space-between; background: #f9fafb; border: 1.5px solid #d1d5db; border-radius: 6px; padding: 10px 16px; margin-bottom: 20px; font-size: 13px; }
+  .meta-box strong { font-size: 14px; color: #111; }
+  .grid-table { width: 100%; border-collapse: separate; border-spacing: 10px; margin-bottom: 20px; table-layout: fixed; }
+  .col-card { border: 2px solid #374151; border-radius: 8px; vertical-align: top; padding: 0; background: #fff; width: 25%; }
+  .col-card.buffer { border: 2px dashed #9ca3af; background: #f9fafb; }
+  .col-header { background: #374151; color: #fff; padding: 8px 10px; font-size: 12.5px; font-weight: 700; display: flex; justify-content: space-between; }
+  .col-header.buffer { background: #9ca3af; }
+  .col-body { padding: 14px 10px; min-height: 120px; }
+  .code { font-size: 15px; font-weight: 800; color: #111; margin-bottom: 4px; }
+  .name { font-size: 12px; color: #4b5563; margin-bottom: 10px; line-height: 1.3; }
+  .badge { display: inline-block; background: #e0f2fe; color: #0369a1; padding: 3px 8px; border-radius: 4px; font-size: 11.5px; font-weight: 700; }
+  .buffer-text { color: #6b7280; font-weight: 700; font-size: 13px; text-align: center; padding-top: 35px; }
+  .instructions { border-top: 1px solid #d1d5db; padding-top: 12px; font-size: 11.5px; color: #4b5563; margin-top: auto; }
+  .instructions ul { margin: 4px 0 0; padding-left: 18px; }
+  .footer-sig { display: flex; justify-content: space-between; margin-top: 24px; padding-top: 10px; font-size: 12px; font-weight: 600; color: #374151; }
+  @media print {
+    body { padding: 10px; }
+    .door-sheet { min-height: 96vh; }
+  }
+`;
+
+export function printDoorNotices(sessions: any[], opts: { date?: string } = {}): boolean {
+  if (!sessions || sessions.length === 0) return false;
+
+  const sheets = sessions
+    .map((s) => {
+      const totalOccupied = (s.columns || []).reduce((sum: number, c: any) => sum + (c.occupied_seats || 0), 0);
+      const dateLabel = officialDateLabel(s.exam_date);
+      const times = timeRange(s.start_time, s.end_time);
+
+      const colsHtml = (s.columns || [])
+        .map((col: any) => {
+          const isBuffer = col.is_empty || !col.exam;
+          if (isBuffer) {
+            return `<td class="col-card buffer">
+              <div class="col-header buffer">
+                <span>COLUMN ${col.column_number}</span>
+                <span>0 / ${col.max_seats}</span>
+              </div>
+              <div class="col-body">
+                <div class="buffer-text">EMPTY BUFFER AISLE<br/><small style="font-weight:400;color:#9ca3af">(No students seated)</small></div>
+              </div>
+            </td>`;
+          }
+
+          const e = col.exam;
+          const classTxt = [e.dept, e.batch ? `Batch ${e.batch}` : "", e.section ? `(${e.section})` : ""]
+            .filter(Boolean)
+            .join(" · ");
+          return `<td class="col-card">
+            <div class="col-header">
+              <span>COLUMN ${col.column_number}</span>
+              <span>${col.occupied_seats} / ${col.max_seats} seats</span>
+            </div>
+            <div class="col-body">
+              <div class="code">${escHtml(e.course_code)}</div>
+              <div class="name">${escHtml(e.course_name)}</div>
+              <div class="badge">${escHtml(classTxt)}</div>
+            </div>
+          </td>`;
+        })
+        .join("");
+
+      return `<section class="door-sheet">
+        <div class="hdr">
+          <div class="hdr-left">Office of the Controller of Examinations</div>
+          <div class="hdr-right">${escHtml(UNIVERSITY)}<small>The International University of Scholars</small></div>
+        </div>
+        <div class="title-bar">
+          <h1>EXAMINATION HALL DOOR NOTICE</h1>
+          <div class="subtitle">Anti-Cheating Column-Wise Seating Plan</div>
+        </div>
+        <div class="meta-box">
+          <div><strong>HALL: ${escHtml(s.room_name)}</strong> ${s.building ? `(${escHtml(s.building)})` : ""}</div>
+          <div><strong>DATE:</strong> ${escHtml(dateLabel)}</div>
+          <div><strong>TIME:</strong> ${escHtml(times)}</div>
+          <div><strong>SEATED:</strong> ${totalOccupied} / ${s.room_capacity} Students</div>
+        </div>
+
+        <table class="grid-table">
+          <tr>${colsHtml}</tr>
+        </table>
+
+        <div class="instructions">
+          <strong>IMPORTANT INSTRUCTIONS FOR STUDENTS:</strong>
+          <ul>
+            <li>Find your Department, Batch, and Course Code, and sit ONLY in your assigned column.</li>
+            <li>Never sit in columns marked "EMPTY BUFFER AISLE".</li>
+            <li>Do not change benches or seats without written permission from the Hall Invigilator.</li>
+            <li>Possession of mobile phones, smartwatches, or unauthorized papers inside the examination hall is strictly prohibited.</li>
+          </ul>
+        </div>
+
+        <div class="footer-sig">
+          <div>Hall Invigilator's Signature: ______________________</div>
+          <div>Controller of Examinations, IUS</div>
+        </div>
+      </section>`;
+    })
+    .join("");
+
+  const title = `${UNIVERSITY} — Door Notices ${opts.date ? `(${opts.date})` : ""}`;
+  const html = `<!doctype html><html><head><meta charset="utf-8"/><title>${escHtml(title)}</title>
+    <style>${DOOR_NOTICE_STYLES}</style></head><body>${sheets}
+    <script>window.onload=function(){window.print();}</script></body></html>`;
+
+  const w = window.open("", "_blank");
+  if (!w) return false;
+  w.document.write(html);
+  w.document.close();
+  return true;
+}

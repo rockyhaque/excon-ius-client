@@ -106,6 +106,10 @@ export const examRoomApi = baseApi.injectEndpoints({
       }),
       invalidatesTags: ["EXAMS", "ROOMS", "ALLOCATIONS"],
     }),
+    getExamSeating: builder.query<any[], void | Record<string, unknown>>({
+      query: (params) => ({ url: "/exam-room/seating", method: "GET", params: params ?? undefined }),
+      providesTags: ["EXAMS", "ROOMS"],
+    }),
   }),
 });
 
@@ -123,4 +127,5 @@ export const {
   useUpdateRoomMutation,
   useDeleteRoomMutation,
   useAssignRoomToExamMutation,
+  useGetExamSeatingQuery,
 } = examRoomApi;

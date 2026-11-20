@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { toast } from "react-toastify";
 import "@/styles/overview.css";
 import { Modal } from "@/components/ui/Modal";
+import { ConfirmModal } from "@/components/ui/ConfirmModal";
 import { IconEdit, IconTrash } from "@/components/ui/Icons";
 import { isUpcoming } from "@/utils/stats";
 import { getErrorMessage } from "@/utils/getErrorMessage";
@@ -64,6 +65,7 @@ export function ExamsPanel() {
 
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<Exam | null>(null);
+  const [pendingDelete, setPendingDelete] = useState<Exam | null>(null);
   const [batchId, setBatchId] = useState<string>("");
   const [sectionId, setSectionId] = useState<string>("");
   const [courseId, setCourseId] = useState<string>("");
@@ -174,11 +176,12 @@ export function ExamsPanel() {
     }
   };
 
-  const onDelete = async (e: Exam) => {
-    if (!window.confirm(`Delete exam "${e.course_code}" on ${String(e.exam_date).slice(0, 10)}?`)) return;
+  const confirmDelete = async () => {
+    if (!pendingDelete) return;
     try {
-      await deleteExam(e.id).unwrap();
+      await deleteExam(pendingDelete.id).unwrap();
       toast.success("Exam deleted.");
+      setPendingDelete(null);
     } catch (err: unknown) {
       toast.error(getErrorMessage(err, "Could not delete exam."));
     }
@@ -282,7 +285,7 @@ export function ExamsPanel() {
                         type="button"
                         className="foundations__icon-btn foundations__icon-btn--danger"
                         disabled={deleting}
-                        onClick={() => void onDelete(e)}
+                        onClick={() => setPendingDelete(e)}
                         aria-label="Delete"
                       >
                         <IconTrash />
@@ -386,6 +389,19 @@ export function ExamsPanel() {
           {formError ? <div className="foundations__error">{formError}</div> : null}
         </div>
       </Modal>
+
+      <ConfirmModal
+        open={Boolean(pendingDelete)}
+        title="Delete exam"
+        message={
+          pendingDelete
+            ? `Delete exam "${pendingDelete.course_code}" on ${String(pendingDelete.exam_date).slice(0, 10)}? This cannot be undone.`
+            : ""
+        }
+        busy={deleting}
+        onClose={() => setPendingDelete(null)}
+        onConfirm={() => void confirmDelete()}
+      />
     </>
   );
 }

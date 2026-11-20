@@ -1,6 +1,7 @@
 import { useState } from "react";
 import "@/styles/teacher.css";
 import { Modal } from "@/components/ui/Modal";
+import { ConfirmModal } from "@/components/ui/ConfirmModal";
 import { Tabs } from "@/components/ui/Tabs";
 import { PageCard } from "@/components/ui/PageCard";
 import { EmptyRow, Table } from "@/components/ui/Table";
@@ -29,6 +30,7 @@ export function TeacherLeavesPanel() {
 
   const [tab, setTab] = useState<"list" | "apply">("list");
   const [open, setOpen] = useState(false);
+  const [pendingCancelId, setPendingCancelId] = useState<string | null>(null);
   const [start, setStart] = useState("");
   const [end, setEnd] = useState("");
   const [reason, setReason] = useState("");
@@ -137,9 +139,7 @@ export function TeacherLeavesPanel() {
                           type="button"
                           className="foundations__danger"
                           disabled={cancelling}
-                          onClick={() => {
-                            if (window.confirm("Cancel this leave request?")) void onCancel(row.id);
-                          }}
+                          onClick={() => setPendingCancelId(String(row.id))}
                         >
                           Cancel
                         </button>
@@ -196,6 +196,21 @@ export function TeacherLeavesPanel() {
             {formError ? <div className="foundations__error">{formError}</div> : null}
           </div>
         </Modal>
+
+        <ConfirmModal
+          open={Boolean(pendingCancelId)}
+          title="Cancel Leave Request"
+          message="Are you sure you want to cancel this leave request? This cannot be undone."
+          confirmLabel="Cancel Request"
+          busy={cancelling}
+          onClose={() => setPendingCancelId(null)}
+          onConfirm={async () => {
+            if (!pendingCancelId) return;
+            const id = pendingCancelId;
+            setPendingCancelId(null);
+            await onCancel(id);
+          }}
+        />
     </PageCard>
   );
 }
