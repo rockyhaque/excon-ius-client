@@ -584,124 +584,128 @@ export function allocationCsv(rows: PublishedAllocationRow[], opts: { dept?: str
 export const stampName = (base: string, ext: string): string =>
   `IUS_${base}_${new Date().toISOString().slice(0, 10)}.${ext}`;
 
-// ── Classroom Door Notices (Column Seating Plan PDF) ────────────────────────
+// ── Classroom Door Notices (Continuous Seating Plan Table PDF) ──────────────
 const DOOR_NOTICE_STYLES = `
   * { box-sizing: border-box; }
-  html, body { background: #fff; }
-  body { font-family: "Segoe UI", Arial, sans-serif; color: #111; padding: 20px; }
-  .door-sheet { page-break-after: always; padding: 10px 0; min-height: 90vh; display: flex; flex-direction: column; }
-  .door-sheet:last-child { page-break-after: auto; }
-  .hdr { display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 2px solid #5c0931; padding-bottom: 8px; margin-bottom: 12px; }
-  .hdr-left { font-size: 13px; font-weight: 700; color: #111; }
-  .hdr-right { text-align: right; font-weight: 700; font-size: 15px; color: #5c0931; }
-  .hdr-right small { display: block; font-weight: 400; font-size: 11px; color: #555; }
-  .title-bar { text-align: center; margin: 10px 0 16px; }
-  .title-bar h1 { font-size: 20px; margin: 0; color: #5c0931; text-transform: uppercase; letter-spacing: 0.5px; }
-  .title-bar .subtitle { font-size: 13px; color: #4b5563; margin-top: 4px; }
-  .meta-box { display: flex; justify-content: space-between; background: #f9fafb; border: 1.5px solid #d1d5db; border-radius: 6px; padding: 10px 16px; margin-bottom: 20px; font-size: 13px; }
-  .meta-box strong { font-size: 14px; color: #111; }
-  .grid-table { width: 100%; border-collapse: separate; border-spacing: 10px; margin-bottom: 20px; table-layout: fixed; }
-  .col-card { border: 2px solid #374151; border-radius: 8px; vertical-align: top; padding: 0; background: #fff; width: 25%; }
-  .col-card.buffer { border: 2px dashed #9ca3af; background: #f9fafb; }
-  .col-header { background: #374151; color: #fff; padding: 8px 10px; font-size: 12.5px; font-weight: 700; display: flex; justify-content: space-between; }
-  .col-header.buffer { background: #9ca3af; }
-  .col-body { padding: 14px 10px; min-height: 120px; }
-  .code { font-size: 15px; font-weight: 800; color: #111; margin-bottom: 4px; }
-  .name { font-size: 12px; color: #4b5563; margin-bottom: 10px; line-height: 1.3; }
-  .badge { display: inline-block; background: #e0f2fe; color: #0369a1; padding: 3px 8px; border-radius: 4px; font-size: 11.5px; font-weight: 700; }
-  .buffer-text { color: #6b7280; font-weight: 700; font-size: 13px; text-align: center; padding-top: 35px; }
-  .instructions { border-top: 1px solid #d1d5db; padding-top: 12px; font-size: 11.5px; color: #4b5563; margin-top: auto; }
-  .instructions ul { margin: 4px 0 0; padding-left: 18px; }
-  .footer-sig { display: flex; justify-content: space-between; margin-top: 24px; padding-top: 10px; font-size: 12px; font-weight: 600; color: #374151; }
+  html, body { background: #fff; margin: 0; padding: 0; }
+  body { font-family: "Segoe UI", Arial, sans-serif; color: #111; padding: 24px 28px; font-size: 10.5pt; }
+  .report-header { text-align: center; border-bottom: 2px solid #5c0931; padding-bottom: 12px; margin-bottom: 16px; }
+  .univ-title { font-size: 18pt; font-weight: 800; color: #5c0931; letter-spacing: 0.5px; margin: 0; }
+  .univ-sub { font-size: 11pt; font-weight: 600; color: #374151; margin-top: 2px; }
+  .doc-title { font-size: 13pt; font-weight: 800; color: #111; text-transform: uppercase; margin-top: 8px; letter-spacing: 0.5px; }
+  .doc-meta { font-size: 10pt; color: #4b5563; margin-top: 4px; font-weight: 500; }
+
+  .seating-table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 9.5pt; }
+  .seating-table th, .seating-table td { border: 1px solid #374151; padding: 6px 8px; vertical-align: middle; }
+  .seating-table th { background: #f3f4f6; font-weight: 700; color: #111; text-align: left; }
+  .seating-table th.center, .seating-table td.center { text-align: center; }
+  .seating-table th.right, .seating-table td.right { text-align: right; }
+  .seating-table tr:nth-child(even) td { background: #fbfcfd; }
+  .seating-table tr { page-break-inside: avoid; }
+
+  .room-cell { font-weight: 800; font-size: 10pt; color: #5c0931; }
+  .code-cell { font-weight: 700; color: #111; }
+  .dept-cell { font-weight: 600; }
+  .student-count { font-weight: 700; color: #111; }
+  .buffer-text { color: #9ca3af; font-style: italic; }
+
+  .summary-stats { display: flex; justify-content: space-between; margin-top: 14px; font-size: 10pt; font-weight: 600; color: #374151; border-top: 1px solid #d1d5db; padding-top: 8px; page-break-inside: avoid; }
+  .footer-sig { display: flex; justify-content: space-between; margin-top: 36px; padding-top: 10px; font-size: 10pt; font-weight: 600; color: #111; page-break-inside: avoid; }
+
   @media print {
-    body { padding: 10px; }
-    .door-sheet { min-height: 96vh; }
+    body { padding: 8mm 6mm; }
+    @page { margin: 8mm; size: A4 portrait; }
+    .report-header { margin-bottom: 10px; }
+    .seating-table { font-size: 9pt; }
+    .seating-table th, .seating-table td { padding: 5px 6px; }
   }
 `;
 
 export function printDoorNotices(sessions: any[], opts: { date?: string } = {}): boolean {
   if (!sessions || sessions.length === 0) return false;
 
-  const sheets = sessions
-    .map((s) => {
-      const totalOccupied = (s.columns || []).reduce((sum: number, c: any) => sum + (c.occupied_seats || 0), 0);
-      const dateLabel = officialDateLabel(s.exam_date);
-      const times = timeRange(s.start_time, s.end_time);
+  let totalStudents = 0;
+  const uniqueRooms = new Set<string>();
 
-      const colsHtml = (s.columns || [])
-        .map((col: any) => {
-          const isBuffer = col.is_empty || !col.exam;
-          if (isBuffer) {
-            return `<td class="col-card buffer">
-              <div class="col-header buffer">
-                <span>COLUMN ${col.column_number}</span>
-                <span>0 / ${col.max_seats}</span>
-              </div>
-              <div class="col-body">
-                <div class="buffer-text">EMPTY BUFFER AISLE<br/><small style="font-weight:400;color:#9ca3af">(No students seated)</small></div>
-              </div>
-            </td>`;
-          }
+  const rowsHtml: string[] = [];
+  sessions.forEach((s) => {
+    uniqueRooms.add(String(s.room_name || s.room_id));
+    const cols = s.columns || [];
+    cols.forEach((col: any, colIdx: number) => {
+      const isEmpty = col.is_empty || !col.exam;
+      const count = col.occupied_seats || 0;
+      totalStudents += count;
 
-          const e = col.exam;
-          const classTxt = [e.dept, e.batch ? `Batch ${e.batch}` : "", e.section ? `(${e.section})` : ""]
-            .filter(Boolean)
-            .join(" · ");
-          return `<td class="col-card">
-            <div class="col-header">
-              <span>COLUMN ${col.column_number}</span>
-              <span>${col.occupied_seats} / ${col.max_seats} seats</span>
-            </div>
-            <div class="col-body">
-              <div class="code">${escHtml(e.course_code)}</div>
-              <div class="name">${escHtml(e.course_name)}</div>
-              <div class="badge">${escHtml(classTxt)}</div>
-            </div>
-          </td>`;
-        })
-        .join("");
+      const timeTxt = timeRange(s.start_time, s.end_time);
+      const isLastCol = colIdx === cols.length - 1;
+      const borderBottomStyle = isLastCol ? 'border-bottom: 2px solid #374151;' : '';
 
-      return `<section class="door-sheet">
-        <div class="hdr">
-          <div class="hdr-left">Office of the Controller of Examinations</div>
-          <div class="hdr-right">${escHtml(UNIVERSITY)}<small>The International University of Scholars</small></div>
-        </div>
-        <div class="title-bar">
-          <h1>EXAMINATION HALL DOOR NOTICE</h1>
-          <div class="subtitle">Anti-Cheating Column-Wise Seating Plan</div>
-        </div>
-        <div class="meta-box">
-          <div><strong>HALL: ${escHtml(s.room_name)}</strong> ${s.building ? `(${escHtml(s.building)})` : ""}</div>
-          <div><strong>DATE:</strong> ${escHtml(dateLabel)}</div>
-          <div><strong>TIME:</strong> ${escHtml(times)}</div>
-          <div><strong>SEATED:</strong> ${totalOccupied} / ${s.room_capacity} Students</div>
-        </div>
+      const roomTd = colIdx === 0
+        ? `<td class="room-cell" rowspan="${cols.length || 1}" style="vertical-align: middle; background: #fff;">${escHtml(s.room_name || "—")}</td>`
+        : "";
 
-        <table class="grid-table">
-          <tr>${colsHtml}</tr>
-        </table>
+      rowsHtml.push(`
+        <tr style="${borderBottomStyle}">
+          ${roomTd}
+          <td>${escHtml(s.building || "Campus")}</td>
+          <td class="center">${escHtml(timeTxt)}</td>
+          <td class="center">${escHtml(s.room_capacity || "—")}</td>
+          <td class="center" style="font-weight:700;">${escHtml(col.column_number)}</td>
+          <td class="dept-cell">${col.exam ? escHtml(col.exam.dept) : "—"}</td>
+          <td class="center">${col.exam ? escHtml(col.exam.batch) : "—"}</td>
+          <td class="center">${col.exam?.section ? escHtml(col.exam.section) : "—"}</td>
+          <td class="code-cell">${col.exam ? escHtml(col.exam.course_code) : '<span class="buffer-text">— (Empty)</span>'}</td>
+          <td class="center student-count">${isEmpty ? "0" : count}</td>
+        </tr>
+      `);
+    });
+  });
 
-        <div class="instructions">
-          <strong>IMPORTANT INSTRUCTIONS FOR STUDENTS:</strong>
-          <ul>
-            <li>Find your Department, Batch, and Course Code, and sit ONLY in your assigned column.</li>
-            <li>Never sit in columns marked "EMPTY BUFFER AISLE".</li>
-            <li>Do not change benches or seats without written permission from the Hall Invigilator.</li>
-            <li>Possession of mobile phones, smartwatches, or unauthorized papers inside the examination hall is strictly prohibited.</li>
-          </ul>
-        </div>
+  const dateHeading = opts.date ? officialDateLabel(opts.date) : "All Examination Dates";
 
-        <div class="footer-sig">
-          <div>Hall Invigilator's Signature: ______________________</div>
-          <div>Controller of Examinations, IUS</div>
-        </div>
-      </section>`;
-    })
-    .join("");
+  const content = `
+    <div class="report-header">
+      <h1 class="univ-title">${escHtml(UNIVERSITY)}</h1>
+      <div class="univ-sub">Office of the Controller of Examinations</div>
+      <div class="doc-title">Examination Seating Plan & Door Notice</div>
+      <div class="doc-meta"><strong>Date:</strong> ${escHtml(dateHeading)} &nbsp;|&nbsp; <strong>Printed:</strong> ${new Date().toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" })}</div>
+    </div>
 
-  const title = `${UNIVERSITY} — Door Notices ${opts.date ? `(${opts.date})` : ""}`;
+    <table class="seating-table">
+      <thead>
+        <tr>
+          <th style="width: 8%;">Room</th>
+          <th style="width: 12%;">Building</th>
+          <th class="center" style="width: 12%;">Time</th>
+          <th class="center" style="width: 7%;">Seat</th>
+          <th class="center" style="width: 6%;">Column</th>
+          <th style="width: 24%;">Department</th>
+          <th class="center" style="width: 6%;">Batch</th>
+          <th class="center" style="width: 6%;">Section</th>
+          <th style="width: 12%;">Course Code</th>
+          <th class="center" style="width: 7%;">Students</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${rowsHtml.join("")}
+      </tbody>
+    </table>
+
+    <div class="summary-stats">
+      <div>Active Examination Halls: <strong>${uniqueRooms.size}</strong></div>
+      <div>Total Students Seated: <strong>${totalStudents}</strong></div>
+    </div>
+
+    <div class="footer-sig">
+      <div>Prepared By: __________________________</div>
+      <div>Verified By: __________________________</div>
+      <div>Controller of Examinations, IUS</div>
+    </div>
+  `;
+
+  const title = `${UNIVERSITY} — Seating Plan ${opts.date ? `(${opts.date})` : ""}`;
   const html = `<!doctype html><html><head><meta charset="utf-8"/><title>${escHtml(title)}</title>
-    <style>${DOOR_NOTICE_STYLES}</style></head><body>${sheets}
+    <style>${DOOR_NOTICE_STYLES}</style></head><body>${content}
     <script>window.onload=function(){window.print();}</script></body></html>`;
 
   const w = window.open("", "_blank");

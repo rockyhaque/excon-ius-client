@@ -48,7 +48,7 @@ export function RoomSeatingModal({ open, onClose, semesterId }: RoomSeatingModal
             onClick={handlePrint}
             disabled={filteredSessions.length === 0}
           >
-            🖨️ Print Door Notices (PDF)
+            🖨️ Print (PDF)
           </button>
           <button className="foundations__btn" type="button" onClick={onClose}>
             Close
@@ -91,7 +91,7 @@ export function RoomSeatingModal({ open, onClose, semesterId }: RoomSeatingModal
             disabled={filteredSessions.length === 0}
             style={{ display: "inline-flex", alignItems: "center", gap: 6 }}
           >
-            🖨️ Print Door Notices (PDF)
+            🖨️ Print (PDF)
           </button>
         </div>
 

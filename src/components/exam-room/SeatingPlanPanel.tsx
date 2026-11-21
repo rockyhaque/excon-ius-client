@@ -4,7 +4,7 @@ import "@/styles/overview.css";
 import "@/styles/foundations.css";
 import { useGetSemestersQuery } from "@/redux/features/foundations/foundations.api";
 import { useGetExamSeatingQuery } from "@/redux/features/exam-room/examRoom.api";
-import { printDoorNotices } from "@/utils/exports";
+import { printDoorNotices, downloadCsv } from "@/utils/exports";
 import { arr, s, type Semester } from "@/components/exam-room/examRoutine.types";
 
 interface SeatingPlanPanelProps {
@@ -99,11 +99,44 @@ export function SeatingPlanPanel({ onNavigateToRoutine }: SeatingPlanPanelProps)
     }
   };
 
-  const handlePrintSingle = (session: any) => {
-    const ok = printDoorNotices([session], { date: session.exam_date });
-    if (!ok) {
-      toast.error("Pop-up blocked — please allow pop-ups to print door notices.");
+  const handleExportCsv = () => {
+    if (filteredSessions.length === 0) {
+      toast.error("No seating data to export.");
+      return;
     }
+    const header = [
+      "Room",
+      "Building",
+      "Date",
+      "Time",
+      "Seat",
+      "Column",
+      "Department",
+      "Batch",
+      "Section",
+      "Course Code",
+      "Students",
+    ];
+    const rows: Array<Array<string | number>> = [];
+    filteredSessions.forEach((s: any) => {
+      (s.columns || []).forEach((c: any) => {
+        rows.push([
+          s.room_name || "",
+          s.building || "",
+          s.exam_date || "",
+          `${(s.start_time || "").slice(0, 5)} – ${(s.end_time || "").slice(0, 5)}`,
+          s.room_capacity || 0,
+          c.column_number,
+          c.exam?.dept || "—",
+          c.exam?.batch || "—",
+          c.exam?.section || "—",
+          c.exam?.course_code || "—",
+          c.occupied_seats || 0,
+        ]);
+      });
+    });
+    downloadCsv(`Master_Seating_Plan_${activeDate || "all"}.csv`, header, rows);
+    toast.success("Seating plan CSV downloaded.");
   };
 
   return (
@@ -113,7 +146,7 @@ export function SeatingPlanPanel({ onNavigateToRoutine }: SeatingPlanPanelProps)
         <div className="foundations__toolbar-left" style={{ display: "flex", alignItems: "center", gap: 12 }}>
           <div>
             <h2 className="foundations__h2" style={{ margin: 0 }}>
-              Seating Plan & Door Notices
+              Seating Plan
             </h2>
             <p className="foundations__muted" style={{ margin: "2px 0 0", fontSize: 13 }}>
               Column-based anti-cheating distribution and physical A4 door notices.
@@ -166,6 +199,17 @@ export function SeatingPlanPanel({ onNavigateToRoutine }: SeatingPlanPanelProps)
             style={{ width: 190 }}
           />
 
+          {/* Export CSV Button */}
+          <button
+            className="foundations__btn foundations__btn--ghost"
+            type="button"
+            onClick={handleExportCsv}
+            disabled={filteredSessions.length === 0}
+            style={{ display: "inline-flex", alignItems: "center", gap: 6, fontWeight: 600 }}
+          >
+            Export CSV
+          </button>
+
           {/* Print PDF Button */}
           <button
             className="foundations__btn foundations__btn--primary"
@@ -174,7 +218,7 @@ export function SeatingPlanPanel({ onNavigateToRoutine }: SeatingPlanPanelProps)
             disabled={filteredSessions.length === 0}
             style={{ display: "inline-flex", alignItems: "center", gap: 6, fontWeight: 600 }}
           >
-            🖨️ Print Door Notices (PDF)
+            🖨️ Print (PDF)
           </button>
         </div>
       </div>
@@ -307,177 +351,113 @@ export function SeatingPlanPanel({ onNavigateToRoutine }: SeatingPlanPanelProps)
           </p>
         </div>
       ) : (
-        <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-          {filteredSessions.map((session: any) => {
-            const totalOcc = (session.columns || []).reduce((acc: number, c: any) => acc + (c.occupied_seats || 0), 0);
-            return (
-              <div
-                key={`${session.exam_date}-${session.start_time}-${session.room_id}`}
-                style={{
-                  border: "1px solid #e2e8f0",
-                  borderRadius: 10,
-                  padding: 16,
-                  background: "#ffffff",
-                  boxShadow: "0 1px 3px rgba(0,0,0,0.05)",
-                }}
-              >
-                {/* Room Card Header */}
-                <div
-                  style={{
-                    display: "flex",
-                    justifyContent: "space-between",
-                    alignItems: "center",
-                    flexWrap: "wrap",
-                    gap: 10,
-                    marginBottom: 14,
-                    paddingBottom: 10,
-                    borderBottom: "1px solid #f1f5f9",
-                  }}
-                >
-                  <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                    <span
+        <div
+          className="foundations__table-wrap"
+          style={{
+            border: "1px solid #e2e8f0",
+            borderRadius: 10,
+            background: "#ffffff",
+            overflowX: "auto",
+            boxShadow: "0 1px 3px rgba(0,0,0,0.04)",
+          }}
+        >
+          <table className="foundations__table" style={{ width: "100%", borderCollapse: "collapse", minWidth: 920 }}>
+            <thead>
+              <tr style={{ background: "#f8fafc", borderBottom: "2px solid #e2e8f0" }}>
+                <th style={{ padding: "12px 12px", textAlign: "left", width: "7%" }}>Room</th>
+                <th style={{ padding: "12px 12px", textAlign: "left", width: "11%" }}>Building</th>
+                <th style={{ padding: "12px 12px", textAlign: "left", width: "11%" }}>Time</th>
+                <th style={{ padding: "12px 10px", textAlign: "center", width: "6%" }}>Seat</th>
+                <th style={{ padding: "12px 10px", textAlign: "center", width: "6%" }}>Column</th>
+                <th style={{ padding: "12px 14px", textAlign: "left", width: "26%" }}>Department</th>
+                <th style={{ padding: "12px 10px", textAlign: "center", width: "6%" }}>Batch</th>
+                <th style={{ padding: "12px 10px", textAlign: "center", width: "6%" }}>Section</th>
+                <th style={{ padding: "12px 14px", textAlign: "left", width: "14%" }}>Course Code</th>
+                <th style={{ padding: "12px 12px", textAlign: "center", width: "7%", whiteSpace: "nowrap" }}>Students</th>
+              </tr>
+            </thead>
+            <tbody>
+              {filteredSessions.flatMap((session: any) => {
+                const cols = session.columns || [];
+                return cols.map((col: any, colIdx: number) => {
+                  const isEmpty = col.is_empty || !col.exam;
+                  const isLastCol = colIdx === cols.length - 1;
+                  return (
+                    <tr
+                      key={`${session.exam_date}-${session.start_time}-${session.room_id}-${col.column_number}`}
                       style={{
-                        background: "#5c0931",
-                        color: "#fff",
-                        fontWeight: 700,
-                        fontSize: 14,
-                        padding: "3px 10px",
-                        borderRadius: 6,
+                        borderBottom: isLastCol ? "2px solid #cbd5e1" : "1px solid #f1f5f9",
+                        background: isEmpty ? "#fafafa" : "#ffffff",
                       }}
                     >
-                      Room {session.room_name}
-                    </span>
-                    <span style={{ fontSize: 13, color: "#64748b", fontWeight: 500 }}>
-                      {session.building || "Campus"} · Capacity: {session.room_capacity} seats
-                    </span>
-                    <span
-                      style={{
-                        fontSize: 12,
-                        padding: "2px 8px",
-                        borderRadius: 4,
-                        background: totalOcc >= session.room_capacity ? "#fef2f2" : "#f0fdf4",
-                        color: totalOcc >= session.room_capacity ? "#991b1b" : "#166534",
-                        fontWeight: 600,
-                      }}
-                    >
-                      {totalOcc} / {session.room_capacity} seated
-                    </span>
-                  </div>
-
-                  <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                    <div style={{ fontSize: 13, fontWeight: 600, color: "#334155" }}>
-                      📅 {session.exam_date} &nbsp;·&nbsp; 🕒 {session.start_time?.slice(0, 5)} – {session.end_time?.slice(0, 5)}
-                    </div>
-                    <button
-                      type="button"
-                      className="foundations__btn foundations__btn--ghost"
-                      onClick={() => handlePrintSingle(session)}
-                      style={{ fontSize: 12, padding: "4px 10px", borderColor: "#cbd5e1" }}
-                      title="Print this individual room door notice"
-                    >
-                      🖨️ Print Notice
-                    </button>
-                  </div>
-                </div>
-
-                {/* 4-Column Classroom Layout Grid */}
-                <div
-                  style={{
-                    display: "grid",
-                    gridTemplateColumns: `repeat(${session.columns?.length || 4}, minmax(0, 1fr))`,
-                    gap: 12,
-                  }}
-                >
-                  {session.columns?.map((col: any) => {
-                    const isEmpty = col.is_empty || !col.exam;
-                    return (
-                      <div
-                        key={col.column_number}
-                        style={{
-                          background: isEmpty ? "#f8fafc" : "#f0fdf4",
-                          border: isEmpty ? "1px dashed #cbd5e1" : "1px solid #bbf7d0",
-                          borderRadius: 8,
-                          padding: 12,
-                          display: "flex",
-                          flexDirection: "column",
-                          gap: 6,
-                          minHeight: 120,
-                        }}
-                      >
-                        <div
+                      {/* Room - Row-spanned only for Room column */}
+                      {colIdx === 0 && (
+                        <td
+                          rowSpan={cols.length || 1}
                           style={{
-                            display: "flex",
-                            justifyContent: "space-between",
-                            alignItems: "center",
-                            fontSize: 12,
+                            padding: "10px 14px",
                             fontWeight: 700,
-                            color: isEmpty ? "#94a3b8" : "#166534",
-                            borderBottom: isEmpty ? "1px dashed #e2e8f0" : "1px solid #dcfce7",
-                            paddingBottom: 4,
+                            fontSize: 14,
+                            color: "#5c0931",
+                            verticalAlign: "middle",
+                            background: "#ffffff",
+                            borderRight: "1px solid #e2e8f0",
                           }}
                         >
-                          <span>COLUMN {col.column_number}</span>
-                          <span style={{ fontSize: 11 }}>
-                            {col.occupied_seats} / {col.max_seats} seats
-                          </span>
-                        </div>
+                          {session.room_name}
+                        </td>
+                      )}
 
-                        {!isEmpty && col.exam ? (
-                          <>
-                            <div style={{ fontSize: 14, fontWeight: 700, color: "#111827", marginTop: 2 }}>
-                              {col.exam.course_code}
-                            </div>
-                            <div
-                              style={{
-                                fontSize: 12,
-                                color: "#374151",
-                                overflow: "hidden",
-                                textOverflow: "ellipsis",
-                                whiteSpace: "nowrap",
-                              }}
-                              title={col.exam.course_name}
-                            >
-                              {col.exam.course_name}
-                            </div>
-                            <div
-                              style={{
-                                fontSize: 11,
-                                marginTop: "auto",
-                                padding: "3px 8px",
-                                borderRadius: 4,
-                                background: "#e0f2fe",
-                                color: "#0369a1",
-                                width: "fit-content",
-                                fontWeight: 600,
-                              }}
-                            >
-                              {col.exam.dept} · B{col.exam.batch}
-                              {col.exam.section ? ` (${col.exam.section})` : ""}
-                            </div>
-                          </>
-                        ) : (
-                          <div
-                            style={{
-                              fontSize: 12,
-                              color: "#94a3b8",
-                              fontStyle: "italic",
-                              marginTop: "auto",
-                              marginBottom: "auto",
-                              textAlign: "center",
-                              lineHeight: 1.4,
-                            }}
-                          >
-                            Empty Buffer Column
-                            <div style={{ fontSize: 10, color: "#cbd5e1" }}>(Anti-Cheating Aisle)</div>
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            );
-          })}
+                      {/* Building */}
+                      <td style={{ padding: "10px 14px", fontSize: 13, color: "#475569" }}>
+                        {session.building || "Campus"}
+                      </td>
+
+                      {/* Time */}
+                      <td style={{ padding: "10px 12px", fontSize: 12.5, color: "#334155", whiteSpace: "nowrap" }}>
+                        {session.start_time?.slice(0, 5)} – {session.end_time?.slice(0, 5)}
+                      </td>
+
+                      {/* Seat */}
+                      <td style={{ padding: "10px 12px", textAlign: "center", fontSize: 13, color: "#475569" }}>
+                        {session.room_capacity}
+                      </td>
+
+                      {/* Column */}
+                      <td style={{ padding: "10px 10px", textAlign: "center", fontWeight: 700, fontSize: 13, color: isEmpty ? "#94a3b8" : "#0f172a" }}>
+                        {col.column_number}
+                      </td>
+
+                      {/* Department */}
+                      <td style={{ padding: "10px 14px", fontWeight: 600, fontSize: 13, color: isEmpty ? "#94a3b8" : "#1e293b" }}>
+                        {col.exam ? col.exam.dept : "—"}
+                      </td>
+
+                      {/* Batch */}
+                      <td style={{ padding: "10px 12px", textAlign: "center", fontSize: 13, color: isEmpty ? "#94a3b8" : "#334155" }}>
+                        {col.exam ? col.exam.batch : "—"}
+                      </td>
+
+                      {/* Section */}
+                      <td style={{ padding: "10px 12px", textAlign: "center", fontSize: 13, color: isEmpty ? "#94a3b8" : "#334155" }}>
+                        {col.exam?.section || "—"}
+                      </td>
+
+                      {/* Course Code */}
+                      <td style={{ padding: "10px 16px", fontWeight: 600, fontSize: 13, color: isEmpty ? "#94a3b8" : "#111827" }}>
+                        {col.exam ? col.exam.course_code : <span style={{ color: "#9ca3af", fontStyle: "italic" }}>—</span>}
+                      </td>
+
+                      {/* Students */}
+                      <td style={{ padding: "10px 12px", textAlign: "center", fontWeight: 700, fontSize: 13, whiteSpace: "nowrap", color: isEmpty ? "#94a3b8" : "#166534" }}>
+                        {col.occupied_seats}
+                      </td>
+                    </tr>
+                  );
+                });
+              })}
+            </tbody>
+          </table>
         </div>
       )}
     </div>
