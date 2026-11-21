@@ -4,7 +4,7 @@ const items = [
   { to: "/super-admin", label: "Overview" },
   { to: "/super-admin/users", label: "All Users" },
   { to: "/super-admin/foundations", label: "Foundations" },
-  { to: "/super-admin/exams-rooms", label: "Exams & Rooms" },
+  { to: "/super-admin/exams-rooms", label: "Exams & Timetables" },
   { to: "/super-admin/allocations", label: "Allocations" },
   { to: "/super-admin/leaves", label: "Leave Requests" },
   { to: "/super-admin/assistant", label: "AI Assistant" },

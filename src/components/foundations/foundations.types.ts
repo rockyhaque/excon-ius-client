@@ -55,6 +55,7 @@ export function mapSections(rows: unknown): Section[] {
     name: safeStr(s.name),
     batch_name: safeStr((s as any).batch_name ?? (s as any).batch_number),
     dept_name: safeStr(s.dept_name),
+    students_count: asNum((s as any).students_count) || 40,
   }));
 }
 

@@ -12,7 +12,7 @@ export type Batch = {
   dept_name?: string;
   status?: BatchStatus;
 };
-export type Section = { id: Id; batch_id: Id; name: string; batch_name?: string; dept_name?: string };
+export type Section = { id: Id; batch_id: Id; name: string; batch_name?: string; dept_name?: string; students_count?: number };
 export type Course = {
   id: Id;
   dept_id: Id;

@@ -28,7 +28,11 @@ import {
   type Semester,
 } from "@/components/exam-room/examRoutine.types";
 
-export function ExamRoutinePanel() {
+interface ExamRoutinePanelProps {
+  onOpenSeating?: () => void;
+}
+
+export function ExamRoutinePanel({ onOpenSeating }: ExamRoutinePanelProps = {}) {
   const { data: semRaw } = useGetSemestersQuery();
   const semesters = useMemo<Semester[]>(
     () => arr(semRaw).map((x) => ({ id: s(x.id), name: s(x.name), season: s(x.season), year: s(x.year) })),
@@ -151,6 +155,7 @@ export function ExamRoutinePanel() {
   const [endDate, setEndDate] = useState("");
   const [slots, setSlots] = useState<{ start: string; end: string }[]>([{ start: "09:00", end: "12:00" }]);
   const [studentsPerSection, setStudentsPerSection] = useState(40);
+  const [gapDays, setGapDays] = useState(1);
 
   const updateSlot = (i: number, field: "start" | "end", val: string) =>
     setSlots((prev) => prev.map((sl, idx) => (idx === i ? { ...sl, [field]: val } : sl)));
@@ -204,13 +209,19 @@ export function ExamRoutinePanel() {
     });
 
   const openGenerate = () => {
-    setGenSem(semesterId || semesters[0]?.id || "");
+    const defaultSem =
+      semesterId ||
+      semesters.find((sm) => arr(semRaw).find((r) => r.id === sm.id && r.is_current))?.id ||
+      semesters[0]?.id ||
+      "";
+    setGenSem(defaultSem);
     setExamType((viewType as ExamType) || "MIDTERM");
     setGenDept("");
     setStartDate("");
     setEndDate("");
     setSlots([{ start: "09:00", end: "12:00" }]);
     setStudentsPerSection(40);
+    setGapDays(1);
     setSkipDays(new Set([5, 6]));
     setReplace(false);
     setGenError(null);
@@ -247,7 +258,7 @@ export function ExamRoutinePanel() {
       }
     }
     try {
-      const sid = genSem;
+      const sid = genSem || semesterId || semesters[0]?.id || "";
       if (!sid) return setGenError("Choose a semester. Create one in Foundations → Semesters if there are none.");
       const doGenerate = (confirmReplace: boolean) =>
         generate({
@@ -262,6 +273,7 @@ export function ExamRoutinePanel() {
           ...(genDept ? { dept_id: genDept } : {}),
           batch_ids: [...selectedBatchIds],
           students_per_section: studentsPerSection,
+          gap_days: gapDays,
         }).unwrap();
 
       let res;
@@ -291,7 +303,7 @@ export function ExamRoutinePanel() {
 
   const confirmRegenerate = async () => {
     setPendingRegenWarning(null);
-    const sid = genSem;
+    const sid = genSem || semesterId || semesters[0]?.id || "";
     if (!sid) return;
     const sortedSlots = [...slots].sort((a, b) => a.start.localeCompare(b.start));
     try {
@@ -307,6 +319,7 @@ export function ExamRoutinePanel() {
         ...(genDept ? { dept_id: genDept } : {}),
         batch_ids: [...selectedBatchIds],
         students_per_section: studentsPerSection,
+        gap_days: gapDays,
       }).unwrap();
 
       setSemesterId(sid);
@@ -529,7 +542,13 @@ export function ExamRoutinePanel() {
           <button
             className="foundations__btn foundations__btn--ghost"
             type="button"
-            onClick={() => setSeatingModalOpen(true)}
+            onClick={() => {
+              if (onOpenSeating) {
+                onOpenSeating();
+              } else {
+                setSeatingModalOpen(true);
+              }
+            }}
             disabled={rows.length === 0}
             style={{ fontWeight: 600, color: "#2563eb", borderColor: "#bfdbfe" }}
           >
@@ -616,6 +635,7 @@ export function ExamRoutinePanel() {
         endDate={endDate}
         slots={slots}
         studentsPerSection={studentsPerSection}
+        gapDays={gapDays}
         skipDays={skipDays}
         replace={replace}
         genError={genError}
@@ -628,6 +648,7 @@ export function ExamRoutinePanel() {
         onSetManyBatches={setManyBatches}
         onStartDateChange={setStartDate}
         onEndDateChange={setEndDate}
+        onGapDaysChange={setGapDays}
         onUpdateSlot={updateSlot}
         onAddSlot={addSlot}
         onRemoveSlot={removeSlot}
