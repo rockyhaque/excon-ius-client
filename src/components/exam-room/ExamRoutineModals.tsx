@@ -19,11 +19,12 @@ export function GenerateRoutineModal({
   startDate,
   endDate,
   slots,
-  studentsPerSection: _studentsPerSection,
+  studentsPerSection,
   gapDays,
   skipDays,
   replace,
   genError,
+  roomOptions,
   onClose,
   onSubmit,
   onGenSemChange,
@@ -58,6 +59,7 @@ export function GenerateRoutineModal({
   skipDays: Set<number>;
   replace: boolean;
   genError: string | null;
+  roomOptions?: RoomOption[];
   onClose: () => void;
   onSubmit: () => void;
   onGenSemChange: (value: string) => void;
@@ -75,8 +77,9 @@ export function GenerateRoutineModal({
   onToggleSkipDay: (day: number) => void;
   onReplaceChange: (value: boolean) => void;
 }) {
-  void _studentsPerSection;
   void _onStudentsPerSectionChange;
+  void roomOptions;
+  void studentsPerSection;
 
   const availableDaysCount = useMemo(() => {
     if (!startDate || !endDate || endDate < startDate) return 0;

@@ -639,6 +639,7 @@ export function ExamRoutinePanel({ onOpenSeating }: ExamRoutinePanelProps = {}) 
         skipDays={skipDays}
         replace={replace}
         genError={genError}
+        roomOptions={roomOptions}
         onClose={() => setGenOpen(false)}
         onSubmit={() => void submitGenerate()}
         onGenSemChange={setGenSem}

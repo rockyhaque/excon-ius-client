@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { toast } from "react-toastify";
 import "@/styles/overview.css";
 import { getErrorMessage } from "@/utils/getErrorMessage";
@@ -122,10 +122,18 @@ export function AllocationsPanel() {
   const [publish, { isLoading: publishing }] = usePublishAllocationMutation();
   const [clearDraft, { isLoading: clearing }] = useClearDraftAllocationMutation();
   const [editAllocation, { isLoading: saving }] = useEditAllocationMutation();
-  const exportQuery = useGetPublishedAllocationsQuery();
-  const exportRows = useMemo(() => (exportQuery.data ?? []) as PublishedAllocationRow[], [exportQuery.data]);
-  const exportDepts = useMemo(() => deptsOf(exportRows), [exportRows]);
-  const [exportDept, setExportDept] = useState("");
+  const [selectedDept, setSelectedDept] = useState("");
+  const availableDepts = useMemo(() => deptsOf(activeRows), [activeRows]);
+  const displayedRows = useMemo(
+    () => (selectedDept ? activeRows.filter((r) => r.dept === selectedDept) : activeRows),
+    [activeRows, selectedDept],
+  );
+
+  useEffect(() => {
+    if (selectedDept && !availableDepts.includes(selectedDept)) {
+      setSelectedDept("");
+    }
+  }, [availableDepts, selectedDept]);
   const [searchTeachers, teacherSearch] = useLazyGetTeacherInfoQuery();
 
   const [editing, setEditing] = useState<AllocationRow | null>(null);
@@ -235,22 +243,21 @@ export function AllocationsPanel() {
     else if (act === "clear") await executeClearDraft();
   };
 
-  const noRowsToast = () => toast.info("No published duties to export yet. Publish the routine first.");
-
   const onExportCsv = () => {
-    if (exportRows.length === 0) return noRowsToast();
-    const { header, rows } = allocationCsv(exportRows, { dept: exportDept });
-    downloadCsv(stampName(exportDept ? `Invigilation_${exportDept}` : "Invigilation_Routine", "csv"), header, rows);
+    if (activeRows.length === 0) return toast.info("No allocations to export.");
+    const prefix = tab === "draft" ? "Draft_Invigilation" : "Invigilation";
+    const { header, rows } = allocationCsv(activeRows as unknown as PublishedAllocationRow[], { dept: selectedDept });
+    downloadCsv(stampName(selectedDept ? `${prefix}_${selectedDept}` : `${prefix}_Routine`, "csv"), header, rows);
     toast.success("Invigilation routine exported.");
   };
   const onDutySlips = () => {
-    if (exportRows.length === 0) return noRowsToast();
-    if (!printDocument("Duty Slips", buildDutySlipsHtml(exportRows, { dept: exportDept })))
+    if (activeRows.length === 0) return toast.info("No allocations to export.");
+    if (!printDocument("Duty Slips", buildDutySlipsHtml(activeRows as unknown as PublishedAllocationRow[], { dept: selectedDept })))
       toast.error("Pop-up blocked — allow pop-ups to export.");
   };
   const onHallPackets = () => {
-    if (exportRows.length === 0) return noRowsToast();
-    if (!printDocument("Hall Packets", buildHallPacketsHtml(exportRows, { dept: exportDept })))
+    if (activeRows.length === 0) return toast.info("No allocations to export.");
+    if (!printDocument("Hall Packets", buildHallPacketsHtml(activeRows as unknown as PublishedAllocationRow[], { dept: selectedDept })))
       toast.error("Pop-up blocked — allow pop-ups to export.");
   };
 
@@ -430,27 +437,34 @@ export function AllocationsPanel() {
 
         <div className="foundations__toolbar">
           <div className="foundations__toolbar-left">
-            <span className="foundations__muted" style={{ margin: 0 }}>Exports for teachers &amp; staff</span>
+            <label style={{ display: "inline-flex", alignItems: "center", gap: 8, fontSize: 13, fontWeight: 500, color: "#475569" }}>
+              <span>Department:</span>
+              <select
+                className="foundations__filter-control"
+                value={selectedDept}
+                onChange={(e) => setSelectedDept(e.target.value)}
+                aria-label="Filter allocations by department"
+              >
+                <option value="">All departments ({activeRows.length})</option>
+                {availableDepts.map((d) => {
+                  const count = activeRows.filter((r) => r.dept === d).length;
+                  return (
+                    <option key={d} value={d}>
+                      {d} ({count})
+                    </option>
+                  );
+                })}
+              </select>
+            </label>
           </div>
           <div className="foundations__toolbar-right">
-            <select
-              className="foundations__filter-control"
-              value={exportDept}
-              onChange={(e) => setExportDept(e.target.value)}
-              aria-label="Department filter for exports"
-            >
-              <option value="">All departments</option>
-              {exportDepts.map((d) => (
-                <option key={d} value={d}>{d}</option>
-              ))}
-            </select>
-            <button className="foundations__btn foundations__btn--ghost" type="button" onClick={onExportCsv} disabled={exportRows.length === 0}>
+            <button className="foundations__btn foundations__btn--ghost" type="button" onClick={onExportCsv} disabled={activeRows.length === 0}>
               Routine CSV
             </button>
-            <button className="foundations__btn foundations__btn--ghost" type="button" onClick={onDutySlips} disabled={exportRows.length === 0}>
+            <button className="foundations__btn foundations__btn--ghost" type="button" onClick={onDutySlips} disabled={activeRows.length === 0}>
               Duty slips (PDF)
             </button>
-            <button className="foundations__btn foundations__btn--ghost" type="button" onClick={onHallPackets} disabled={exportRows.length === 0}>
+            <button className="foundations__btn foundations__btn--ghost" type="button" onClick={onHallPackets} disabled={activeRows.length === 0}>
               Hall packets (PDF)
             </button>
           </div>
@@ -515,14 +529,14 @@ export function AllocationsPanel() {
 
         {tab === "draft" ? (
           <AllocationTable
-            rows={draftRows}
+            rows={displayedRows}
             isLoading={draftQuery.isLoading}
             isError={Boolean(draftQuery.error)}
             onEdit={openEdit}
           />
         ) : (
           <AllocationTable
-            rows={publishedRows}
+            rows={displayedRows}
             isLoading={publishedQuery.isLoading}
             isError={Boolean(publishedQuery.error)}
           />
