@@ -9,9 +9,11 @@ function fmt(v: string | null | undefined) {
 export function TeacherProfileCard({
   profile,
   isLoading,
+  onLeave = false,
 }: {
   profile: TeacherProfile | null;
   isLoading: boolean;
+  onLeave?: boolean;
 }) {
   if (isLoading) {
     return (
@@ -74,13 +76,11 @@ export function TeacherProfileCard({
           <span className="teacher-profile__value">{fmt(profile.phone)}</span>
         </div>
         <div className="teacher-profile__field">
-          <span className="teacher-profile__label">Availability (scheduling)</span>
-          {profile.is_available === true ? (
-            <span className="teacher-profile__badge teacher-profile__badge--on">Available for invigilation</span>
-          ) : profile.is_available === false ? (
-            <span className="teacher-profile__badge teacher-profile__badge--off">Not available</span>
+          <span className="teacher-profile__label">Status</span>
+          {onLeave ? (
+            <span className="teacher-profile__badge teacher-profile__badge--off">On leave</span>
           ) : (
-            <span className="teacher-profile__value">—</span>
+            <span className="teacher-profile__badge teacher-profile__badge--on">Active</span>
           )}
         </div>
         <div className="teacher-profile__field" style={{ gridColumn: "1 / -1" }}>

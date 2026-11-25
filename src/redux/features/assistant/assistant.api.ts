@@ -17,12 +17,14 @@ export type AssistantChatResponse = {
   answer: string;
   model: string;
   usage?: AssistantUsage;
+  sources?: { label: string }[];
 };
 
 export type AssistantStatus = {
   configured: boolean;
   model: string | null;
   usage?: AssistantUsage;
+  suggestions?: string[];
 };
 
 export const assistantApi = baseApi.injectEndpoints({

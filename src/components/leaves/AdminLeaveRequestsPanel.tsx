@@ -90,8 +90,15 @@ export function AdminLeaveRequestsPanel() {
     const { type, row } = pendingAction;
     try {
       if (type === "approve") {
-        await approve(row.id).unwrap();
-        toast.success("Leave approved.");
+        const updated = await approve(row.id).unwrap();
+        const moved = Array.isArray((updated as { reassigned?: unknown[] }).reassigned)
+          ? (updated as { reassigned: unknown[] }).reassigned.length
+          : 0;
+        toast.success(
+          moved > 0
+            ? `Leave approved. ${moved} dut${moved === 1 ? "y" : "ies"} moved to a teacher with no duty that day.`
+            : "Leave approved. This teacher had no invigilation duty on those dates.",
+        );
       } else {
         await reject(row.id).unwrap();
         toast.success("Leave rejected.");

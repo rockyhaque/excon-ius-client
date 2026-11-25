@@ -17,7 +17,6 @@ import { Logs } from "@/pages/admin/Logs";
 import { Users } from "@/pages/super-admin/Users";
 import { SuperAdminLogs } from "@/pages/super-admin/Logs";
 import { TeacherOverview } from "@/pages/teacher/TeacherOverview";
-import { Availability } from "@/pages/teacher/Availability";
 import { Leaves } from "@/pages/teacher/Leaves";
 import { MyAllocation } from "@/pages/teacher/MyAllocation";
 import { ExamSchedule } from "@/pages/teacher/ExamSchedule";
@@ -73,7 +72,6 @@ export const router = createBrowserRouter([
     children: [
       { index: true, Component: TeacherOverview },
       { path: "schedule", Component: ExamSchedule },
-      { path: "availability", Component: Availability },
       { path: "leaves", Component: Leaves },
       { path: "allocation", Component: MyAllocation },
       { path: "assistant", Component: Assistant },

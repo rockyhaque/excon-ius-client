@@ -33,8 +33,11 @@ export function TeacherLeavesPanel() {
   const [pendingCancelId, setPendingCancelId] = useState<string | null>(null);
   const [start, setStart] = useState("");
   const [end, setEnd] = useState("");
+  const [cause, setCause] = useState("Sick");
   const [reason, setReason] = useState("");
   const [formError, setFormError] = useState<string | null>(null);
+
+  const CAUSES = ["Sick", "Personal", "Family", "Official", "Other"] as const;
 
   const submit = async () => {
     if (skipApi) return;
@@ -44,9 +47,12 @@ export function TeacherLeavesPanel() {
       return;
     }
     try {
-      await apply({ start_date: start, end_date: end, reason: reason || undefined }).unwrap();
+      const detail = reason.trim();
+      const reasonText = detail ? `${cause} — ${detail}` : cause;
+      await apply({ start_date: start, end_date: end, reason: reasonText }).unwrap();
       setStart("");
       setEnd("");
+      setCause("Sick");
       setReason("");
       setOpen(false);
       setTab("list");
@@ -185,11 +191,21 @@ export function TeacherLeavesPanel() {
               <input type="date" value={end} onChange={(e) => setEnd(e.target.value)} required />
             </label>
             <label className="foundations__field">
-              <span>Reason (optional)</span>
+              <span>Cause</span>
+              <select value={cause} onChange={(e) => setCause(e.target.value)}>
+                {CAUSES.map((c) => (
+                  <option key={c} value={c}>
+                    {c}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="foundations__field">
+              <span>Details (optional)</span>
               <textarea
                 value={reason}
                 onChange={(e) => setReason(e.target.value)}
-                placeholder="Optional"
+                placeholder="Add a short note if the cause needs one"
                 style={{ minHeight: 90, resize: "vertical", borderRadius: 10, padding: "9px 10px", border: "1px solid #d1d5db", font: "inherit" }}
               />
             </label>

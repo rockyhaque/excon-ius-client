@@ -1,7 +1,7 @@
 import "@/styles/teacher.css";
 import "@/styles/overview.css";
 import { useMemo } from "react";
-import { hoursBetween, isUpcoming, leaveDays, num } from "@/utils/stats";
+import { hoursBetween, isUpcoming, leaveDays } from "@/utils/stats";
 import type { PublishedAllocationRow } from "@/types/teacher";
 import type { TeacherLeaveRow } from "@/types/teacher";
 
@@ -10,15 +10,23 @@ function fmtDate(v: unknown): string {
   return isNaN(d.getTime()) ? "—" : d.toLocaleDateString(undefined, { month: "short", day: "numeric" });
 }
 
+function hasCurrentOrUpcomingLeave(leaves: TeacherLeaveRow[]): boolean {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  return leaves.some((l) => {
+    if (String(l.status).toUpperCase() !== "APPROVED") return false;
+    const end = new Date(String(l.end_date ?? "").slice(0, 10));
+    return !isNaN(end.getTime()) && end >= today;
+  });
+}
+
 export function TeacherOverviewStats({
   myDuties,
   leaves,
-  isAvailable,
   isLoading,
 }: {
   myDuties: PublishedAllocationRow[];
   leaves: TeacherLeaveRow[];
-  isAvailable: boolean | null | undefined;
   isLoading: boolean;
 }) {
   const stats = useMemo(() => {
@@ -27,7 +35,6 @@ export function TeacherOverviewStats({
       .sort((a, b) => String(a.exam_date).localeCompare(String(b.exam_date)));
     const next = upcoming[0];
     const totalHours = myDuties.reduce((s, d) => s + hoursBetween(d.start_time, d.end_time), 0);
-    const seats = myDuties.reduce((s, d) => s + num(d.expected_students), 0);
     const pendingLeaves = leaves.filter((l) => String(l.status).toUpperCase() === "PENDING").length;
     const approvedDays = leaves
       .filter((l) => String(l.status).toUpperCase() === "APPROVED")
@@ -43,13 +50,12 @@ export function TeacherOverviewStats({
       upcoming: upcoming.length,
       nextLabel,
       totalHours,
-      seats,
       pendingLeaves,
       approvedDays,
     };
   }, [myDuties, leaves]);
 
-  const availability = isAvailable === true ? "Available" : isAvailable === false ? "Not available" : "—";
+  const status = hasCurrentOrUpcomingLeave(leaves) ? "On leave" : "Active";
 
   const dash = (v: string | number) => (isLoading ? "—" : v);
 
@@ -57,10 +63,9 @@ export function TeacherOverviewStats({
     { label: "Upcoming duties", value: dash(stats.upcoming) },
     { label: "Next duty", value: dash(stats.nextLabel), small: true },
     { label: "Invigilation hours", value: dash(stats.totalHours ? stats.totalHours.toFixed(1) : 0) },
-    { label: "Seats supervised", value: dash(stats.seats) },
     { label: "Pending leaves", value: dash(stats.pendingLeaves) },
     { label: "Approved leave-days", value: dash(stats.approvedDays) },
-    { label: "Availability", value: dash(availability), small: true },
+    { label: "Status", value: dash(status), small: true },
   ];
 
   return (

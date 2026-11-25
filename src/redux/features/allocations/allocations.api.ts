@@ -55,6 +55,10 @@ export const allocationsApi = baseApi.injectEndpoints({
       query: () => ({ url: "/allocations/published", method: "GET" }),
       providesTags: ["ALLOCATIONS"],
     }),
+    getMyAllocations: builder.query<PublishedAllocationRow[], void>({
+      query: () => ({ url: "/allocations/mine", method: "GET" }),
+      providesTags: ["ALLOCATIONS"],
+    }),
     getAllocationConflicts: builder.query<Array<Record<string, unknown> & { reasons: string[] }>, void>({
       query: () => ({ url: "/allocations/conflicts", method: "GET" }),
       providesTags: ["ALLOCATIONS"],
@@ -95,6 +99,7 @@ export const {
   useGetAllocationReportsQuery,
   useLazyExportAllocationReportQuery,
   useGetPublishedAllocationsQuery,
+  useGetMyAllocationsQuery,
   useGetAllocationConflictsQuery,
   useGetTeacherInfoQuery,
   useLazyGetTeacherInfoQuery,
