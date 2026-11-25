@@ -1,3 +1,4 @@
+import { LoadingSpinner } from "@/components/ui/Loading";
 import { Modal } from "@/components/ui/Modal";
 import { fmtDate, fmtTime } from "@/components/allocations/allocations.helpers";
 import type { AllocationRow } from "@/components/allocations/allocations.types";
@@ -85,7 +86,7 @@ export function ReassignAllocationModal({
                 onClick={onSearchTeachers}
                 disabled={teacherSearchFetching || !searchTerm.trim()}
               >
-                {teacherSearchFetching ? "…" : "Search"}
+                {teacherSearchFetching ? <LoadingSpinner compact size={16} /> : "Search"}
               </button>
             </div>
           </label>

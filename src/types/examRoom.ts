@@ -5,6 +5,8 @@ export type Room = {
   name: string;
   building: string;
   capacity: number;
+  columns_count?: number;
+  seats_per_column?: number[];
   is_defect: boolean;
 };
 

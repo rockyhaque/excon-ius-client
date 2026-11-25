@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
 import { toast } from "react-toastify";
+import { LoadingSpinner } from "@/components/ui/Loading";
 import { Modal } from "@/components/ui/Modal";
 import { ConfirmModal } from "@/components/ui/ConfirmModal";
 import { getErrorMessage } from "@/utils/getErrorMessage";
@@ -112,10 +113,10 @@ export function SemestersPanel() {
         </div>
       </div>
 
-      {isLoading ? <p className="foundations__muted">Loading…</p> : null}
+      {isLoading ? <LoadingSpinner /> : null}
       {error ? <p className="foundations__error">Could not load semesters.</p> : null}
 
-      <div className="foundations__table-wrap">
+      <div className="foundations__table-wrap" hidden={isLoading}>
         <table className="foundations__table">
           <thead>
             <tr>
@@ -127,7 +128,7 @@ export function SemestersPanel() {
             </tr>
           </thead>
           <tbody>
-            {rows.length === 0 ? (
+            {!isLoading && rows.length === 0 ? (
               <tr>
                 <td colSpan={5} className="foundations__empty">
                   No semesters yet. Add one to generate a routine against it.

@@ -1,26 +1,23 @@
 import { useState } from "react";
-import { RoomsPanel } from "@/components/exam-room/RoomsPanel";
-import { ExamsPanel } from "@/components/exam-room/ExamsPanel";
 import { ExamRoutinePanel } from "@/components/exam-room/ExamRoutinePanel";
+import { SeatingPlanPanel } from "@/components/exam-room/SeatingPlanPanel";
 import { Tabs } from "@/components/ui/Tabs";
 import { PageCard } from "@/components/ui/PageCard";
 
 export function ExamsRooms() {
-  const [tab, setTab] = useState<"rooms" | "exams" | "routine">("rooms");
+  const [tab, setTab] = useState<"routine" | "seating">("routine");
   return (
-    <PageCard title="Exams & Rooms" lead="Manage rooms and exams, and generate the exam routine.">
+    <PageCard title="Exams & Timetables" lead="Manage exam schedules, classroom seating arrangements, and door notices.">
       <Tabs
         value={tab}
         onChange={setTab}
         items={[
-          { id: "rooms", label: "Rooms" },
-          { id: "exams", label: "Exams" },
-          { id: "routine", label: "Routine" },
+          { id: "routine", label: "Master Routine" },
+          { id: "seating", label: "Seating Plan" },
         ]}
       />
-      {tab === "rooms" ? <RoomsPanel /> : null}
-      {tab === "exams" ? <ExamsPanel /> : null}
-      {tab === "routine" ? <ExamRoutinePanel /> : null}
+      {tab === "routine" ? <ExamRoutinePanel onOpenSeating={() => setTab("seating")} /> : null}
+      {tab === "seating" ? <SeatingPlanPanel onNavigateToRoutine={() => setTab("routine")} /> : null}
     </PageCard>
   );
 }

@@ -44,7 +44,7 @@ export function Home() {
         </div>
         <div className="card">
           <h2>Leaves</h2>
-          <p>Availability updates, leave applications, approvals and history.</p>
+          <p>Leave applications, approvals and history. Teachers on approved leave are marked on leave; everyone else stays active.</p>
         </div>
         <div className="card">
           <h2>Foundations</h2>

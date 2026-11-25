@@ -1,10 +1,12 @@
 import { useMemo, useState } from "react";
 import { toast } from "react-toastify";
 import "@/styles/overview.css";
+import { LoadingSpinner } from "@/components/ui/Loading";
 import { Modal } from "@/components/ui/Modal";
 import { IconEdit, IconTrash } from "@/components/ui/Icons";
 import { ConfirmModal } from "@/components/ui/ConfirmModal";
 import { getErrorMessage } from "@/utils/getErrorMessage";
+import { useFetchAvailabilityQuery } from "@/redux/features/leaves/leaves.api";
 import {
   useCreateAdminMutation,
   useDeleteAdminMutation,
@@ -62,26 +64,29 @@ export function Users() {
 
   // Unfiltered snapshot so header stats stay stable regardless of table filters.
   const { data: allUsers = [] } = useGetAllUsersQuery({ limit: 200 });
+  const { data: availabilityRaw } = useFetchAvailabilityQuery();
   const stats = useMemo(() => {
     const list = Array.isArray(allUsers) ? (allUsers as UserRow[]) : [];
     const byRole = { SUPER_ADMIN: 0, ADMIN: 0, TEACHER: 0 } as Record<string, number>;
     let activeCount = 0;
-    let available = 0;
     for (const u of list) {
       const r = roleOf(u);
       if (r in byRole) byRole[r]++;
       if (asBool(u.is_active ?? true)) activeCount++;
-      if (asBool((u as { is_available?: unknown }).is_available)) available++;
     }
+    const teachers = Array.isArray(availabilityRaw)
+      ? availabilityRaw
+      : ((availabilityRaw as { data?: unknown[] } | undefined)?.data ?? []);
+    const onLeave = (teachers as { leave_id?: unknown }[]).filter((t) => t.leave_id).length;
     return {
       total: list.length,
       byRole,
       active: activeCount,
       inactive: list.length - activeCount,
-      available,
-      onLeave: list.length - available,
+      onLeave,
+      activeTeachers: teachers.length - onLeave,
     };
-  }, [allUsers]);
+  }, [allUsers, availabilityRaw]);
 
   const [createAdmin, { isLoading: creating }] = useCreateAdminMutation();
   const [updateAdmin, { isLoading: updatingAdmin }] = useUpdateAdminMutation();
@@ -236,8 +241,8 @@ export function Users() {
             <div className="foundations__stat-value">{stats.inactive}</div>
           </div>
           <div className="foundations__stat">
-            <div className="foundations__stat-label">Available</div>
-            <div className="foundations__stat-value">{stats.available}</div>
+            <div className="foundations__stat-label">Active teachers</div>
+            <div className="foundations__stat-value">{stats.activeTeachers}</div>
           </div>
           <div className="foundations__stat">
             <div className="foundations__stat-label">On leave</div>
@@ -283,10 +288,10 @@ export function Users() {
           </div>
         </div>
 
-        {isLoading ? <p className="foundations__muted">Loading…</p> : null}
+        {isLoading ? <LoadingSpinner /> : null}
         {error ? <p className="foundations__error">Could not load users.</p> : null}
 
-        <div className="foundations__table-wrap">
+        <div className="foundations__table-wrap" hidden={isLoading}>
           <table className="foundations__table">
             <thead>
               <tr>
@@ -298,7 +303,7 @@ export function Users() {
               </tr>
             </thead>
             <tbody>
-              {rows.length === 0 ? (
+              {!isLoading && rows.length === 0 ? (
                 <tr>
                   <td colSpan={5} className="foundations__empty">
                     No users found.

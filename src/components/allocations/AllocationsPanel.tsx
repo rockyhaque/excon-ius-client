@@ -1,9 +1,7 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { toast } from "react-toastify";
-import "@/styles/overview.css";
 import { getErrorMessage } from "@/utils/getErrorMessage";
-import { ChartCard, DonutChart, HBarList, VIZ } from "@/components/overview/charts";
-import { countBy } from "@/utils/stats";
+import { VIZ } from "@/components/overview/charts";
 import {
   useEditAllocationMutation,
   useGetAiAllocationQuery,
@@ -16,7 +14,7 @@ import {
   useTriggerAiAllocationMutation,
 } from "@/redux/features/allocations/allocations.api";
 import { useGetRoomsQuery } from "@/redux/features/exam-room/examRoom.api";
-import { mapAllocations, mapWorkload, type AllocationRow } from "@/components/allocations/allocations.types";
+import { mapAllocations, type AllocationRow } from "@/components/allocations/allocations.types";
 import type { PublishedAllocationRow } from "@/types/teacher";
 import {
   allocationCsv,
@@ -29,6 +27,7 @@ import {
 } from "@/utils/exports";
 import { AllocationTable } from "@/components/allocations/AllocationTable";
 import { ReassignAllocationModal } from "@/components/allocations/ReassignAllocationModal";
+import { ConfirmModal } from "@/components/ui/ConfirmModal";
 import {
   fmtDate,
   fmtTime,
@@ -75,12 +74,6 @@ export function AllocationsPanel() {
   const stats = reports?.stats as Record<string, unknown> | undefined;
   const activeRows = tab === "draft" ? draftRows : publishedRows;
 
-  const totalExams = toCount(stats?.total_exams);
-  const publishedExams = toCount(stats?.published_exams);
-  const allocatedExams = toCount(stats?.allocated_exams);
-  const draftOnlyExams = Math.max(0, allocatedExams - publishedExams);
-  const unassigned = Math.max(0, totalExams - allocatedExams);
-
   const teachersUtilized = useMemo(
     () => new Set(activeRows.map((r) => r.teacher_id).filter(Boolean)).size,
     [activeRows],
@@ -95,36 +88,24 @@ export function AllocationsPanel() {
     [activeRows],
   );
 
-  const workloadBars = useMemo(() => {
-    return mapWorkload(reports?.workload)
-      .filter((w) => w.name)
-      .slice()
-      .sort((a, b) => b.current_allocations - a.current_allocations)
-      .slice(0, 12)
-      .map((w) => {
-        const cur = w.current_allocations;
-        const lim = w.limit_value;
-        const color =
-          lim > 0 && cur >= lim ? VIZ.critical : lim > 0 && cur >= 0.8 * lim ? VIZ.warning : VIZ.blue;
-        return { id: w.id, label: w.name, value: cur, sub: `/ ${lim}`, color };
-      });
-  }, [reports]);
-
-  const dutiesPerRoom = useMemo(
-    () => countBy(activeRows, (r) => r.room_name, 12),
-    [activeRows],
-  );
-
   const [aiSummary, setAiSummary] = useState<AiSummary | null>(null);
 
   const [triggerAi, { isLoading: generating }] = useTriggerAiAllocationMutation();
   const [publish, { isLoading: publishing }] = usePublishAllocationMutation();
   const [clearDraft, { isLoading: clearing }] = useClearDraftAllocationMutation();
   const [editAllocation, { isLoading: saving }] = useEditAllocationMutation();
-  const exportQuery = useGetPublishedAllocationsQuery();
-  const exportRows = useMemo(() => (exportQuery.data ?? []) as PublishedAllocationRow[], [exportQuery.data]);
-  const exportDepts = useMemo(() => deptsOf(exportRows), [exportRows]);
-  const [exportDept, setExportDept] = useState("");
+  const [selectedDept, setSelectedDept] = useState("");
+  const availableDepts = useMemo(() => deptsOf(activeRows), [activeRows]);
+  const displayedRows = useMemo(
+    () => (selectedDept ? activeRows.filter((r) => r.dept === selectedDept) : activeRows),
+    [activeRows, selectedDept],
+  );
+
+  useEffect(() => {
+    if (selectedDept && !availableDepts.includes(selectedDept)) {
+      setSelectedDept("");
+    }
+  }, [availableDepts, selectedDept]);
   const [searchTeachers, teacherSearch] = useLazyGetTeacherInfoQuery();
 
   const [editing, setEditing] = useState<AllocationRow | null>(null);
@@ -133,6 +114,7 @@ export function AllocationsPanel() {
   const [roomId, setRoomId] = useState("");
   const [searchTerm, setSearchTerm] = useState("");
   const [formError, setFormError] = useState<string | null>(null);
+  const [confirmAction, setConfirmAction] = useState<"generate" | "publish" | "clear" | null>(null);
 
   const openEdit = (r: AllocationRow) => {
     setEditing(r);
@@ -173,10 +155,7 @@ export function AllocationsPanel() {
     }
   };
 
-  const onGenerate = async () => {
-    if (!window.confirm("Generate a fresh DRAFT routine? This replaces any existing draft (published duties are untouched).")) {
-      return;
-    }
+  const executeGenerate = async () => {
     try {
       const res = (await triggerAi().unwrap()) as {
         message?: string;
@@ -208,12 +187,7 @@ export function AllocationsPanel() {
     }
   };
 
-  const onPublish = async () => {
-    if (draftRows.length === 0) {
-      toast.info("No draft routine to publish. Generate one first.");
-      return;
-    }
-    if (!window.confirm("Publish the draft routine? Assigned teachers will be notified by email.")) return;
+  const executePublish = async () => {
     try {
       const res = (await publish().unwrap()) as { message?: string };
       toast.success(res.message ?? "Allocation published.");
@@ -223,12 +197,7 @@ export function AllocationsPanel() {
     }
   };
 
-  const onClearDraft = async () => {
-    if (draftRows.length === 0) {
-      toast.info("No draft routine to clear.");
-      return;
-    }
-    if (!window.confirm("Clear the draft routine? All draft duties are removed. Published duties are kept.")) return;
+  const executeClearDraft = async () => {
     try {
       const res = (await clearDraft().unwrap()) as { message?: string };
       toast.success(res.message ?? "Draft cleared.");
@@ -238,22 +207,29 @@ export function AllocationsPanel() {
     }
   };
 
-  const noRowsToast = () => toast.info("No published duties to export yet. Publish the routine first.");
+  const onConfirmAction = async () => {
+    const act = confirmAction;
+    setConfirmAction(null);
+    if (act === "generate") await executeGenerate();
+    else if (act === "publish") await executePublish();
+    else if (act === "clear") await executeClearDraft();
+  };
 
   const onExportCsv = () => {
-    if (exportRows.length === 0) return noRowsToast();
-    const { header, rows } = allocationCsv(exportRows, { dept: exportDept });
-    downloadCsv(stampName(exportDept ? `Invigilation_${exportDept}` : "Invigilation_Routine", "csv"), header, rows);
+    if (activeRows.length === 0) return toast.info("No allocations to export.");
+    const prefix = tab === "draft" ? "Draft_Invigilation" : "Invigilation";
+    const { header, rows } = allocationCsv(activeRows as unknown as PublishedAllocationRow[], { dept: selectedDept });
+    downloadCsv(stampName(selectedDept ? `${prefix}_${selectedDept}` : `${prefix}_Routine`, "csv"), header, rows);
     toast.success("Invigilation routine exported.");
   };
   const onDutySlips = () => {
-    if (exportRows.length === 0) return noRowsToast();
-    if (!printDocument("Duty Slips", buildDutySlipsHtml(exportRows, { dept: exportDept })))
+    if (activeRows.length === 0) return toast.info("No allocations to export.");
+    if (!printDocument("Duty Slips", buildDutySlipsHtml(activeRows as unknown as PublishedAllocationRow[], { dept: selectedDept })))
       toast.error("Pop-up blocked — allow pop-ups to export.");
   };
   const onHallPackets = () => {
-    if (exportRows.length === 0) return noRowsToast();
-    if (!printDocument("Hall Packets", buildHallPacketsHtml(exportRows, { dept: exportDept })))
+    if (activeRows.length === 0) return toast.info("No allocations to export.");
+    if (!printDocument("Hall Packets", buildHallPacketsHtml(activeRows as unknown as PublishedAllocationRow[], { dept: selectedDept })))
       toast.error("Pop-up blocked — allow pop-ups to export.");
   };
 
@@ -410,50 +386,36 @@ export function AllocationsPanel() {
           </div>
         ) : null}
 
-        <div className="ov-grid" style={{ marginBottom: 16 }}>
-          <ChartCard title="Duty coverage" subtitle="Exams by allocation state">
-            <DonutChart
-              centerLabel="exams"
-              data={[
-                { label: "Published", value: publishedExams, color: VIZ.good },
-                { label: "Draft only", value: draftOnlyExams, color: VIZ.warning },
-                { label: "Unassigned", value: unassigned, color: VIZ.neutral },
-              ]}
-            />
-          </ChartCard>
-
-          <ChartCard title="Invigilation workload" subtitle="Duties assigned per teacher (vs limit)">
-            <HBarList data={workloadBars} unit="duties" />
-          </ChartCard>
-
-          <ChartCard title={`Duties per room (${tab})`} subtitle="Where the current routine sits">
-            <HBarList data={dutiesPerRoom} unit="duties" color={VIZ.orange} />
-          </ChartCard>
-        </div>
-
         <div className="foundations__toolbar">
           <div className="foundations__toolbar-left">
-            <span className="foundations__muted" style={{ margin: 0 }}>Exports for teachers &amp; staff</span>
+            <label style={{ display: "inline-flex", alignItems: "center", gap: 8, fontSize: 13, fontWeight: 500, color: "#475569" }}>
+              <span>Department:</span>
+              <select
+                className="foundations__filter-control"
+                value={selectedDept}
+                onChange={(e) => setSelectedDept(e.target.value)}
+                aria-label="Filter allocations by department"
+              >
+                <option value="">All departments ({activeRows.length})</option>
+                {availableDepts.map((d) => {
+                  const count = activeRows.filter((r) => r.dept === d).length;
+                  return (
+                    <option key={d} value={d}>
+                      {d} ({count})
+                    </option>
+                  );
+                })}
+              </select>
+            </label>
           </div>
           <div className="foundations__toolbar-right">
-            <select
-              className="foundations__filter-control"
-              value={exportDept}
-              onChange={(e) => setExportDept(e.target.value)}
-              aria-label="Department filter for exports"
-            >
-              <option value="">All departments</option>
-              {exportDepts.map((d) => (
-                <option key={d} value={d}>{d}</option>
-              ))}
-            </select>
-            <button className="foundations__btn foundations__btn--ghost" type="button" onClick={onExportCsv} disabled={exportRows.length === 0}>
+            <button className="foundations__btn foundations__btn--ghost" type="button" onClick={onExportCsv} disabled={activeRows.length === 0}>
               Routine CSV
             </button>
-            <button className="foundations__btn foundations__btn--ghost" type="button" onClick={onDutySlips} disabled={exportRows.length === 0}>
+            <button className="foundations__btn foundations__btn--ghost" type="button" onClick={onDutySlips} disabled={activeRows.length === 0}>
               Duty slips (PDF)
             </button>
-            <button className="foundations__btn foundations__btn--ghost" type="button" onClick={onHallPackets} disabled={exportRows.length === 0}>
+            <button className="foundations__btn foundations__btn--ghost" type="button" onClick={onHallPackets} disabled={activeRows.length === 0}>
               Hall packets (PDF)
             </button>
           </div>
@@ -466,18 +428,34 @@ export function AllocationsPanel() {
             </span>
           </div>
           <div className="foundations__toolbar-right">
-            <button className="foundations__btn foundations__btn--ghost" type="button" onClick={() => void onGenerate()} disabled={generating}>
+            <button
+              className="foundations__btn foundations__btn--ghost"
+              type="button"
+              onClick={() => setConfirmAction("generate")}
+              disabled={generating || publishing || clearing}
+            >
               {generating ? "Generating…" : "Generate routine"}
             </button>
             <button
               className="foundations__btn foundations__btn--ghost"
               type="button"
-              onClick={() => void onClearDraft()}
-              disabled={clearing || generating}
+              onClick={() => {
+                if (draftRows.length === 0) return toast.info("No draft routine to clear.");
+                setConfirmAction("clear");
+              }}
+              disabled={clearing || generating || draftRows.length === 0}
             >
               {clearing ? "Clearing…" : "Clear draft"}
             </button>
-            <button className="foundations__btn" type="button" onClick={() => void onPublish()} disabled={publishing || generating}>
+            <button
+              className="foundations__btn"
+              type="button"
+              onClick={() => {
+                if (draftRows.length === 0) return toast.info("No draft routine to publish. Generate one first.");
+                setConfirmAction("publish");
+              }}
+              disabled={publishing || generating || draftRows.length === 0}
+            >
               {publishing ? "Publishing…" : "Publish"}
             </button>
           </div>
@@ -500,20 +478,13 @@ export function AllocationsPanel() {
           </button>
         </div>
 
-        {tab === "draft" ? (
-          <AllocationTable
-            rows={draftRows}
-            isLoading={draftQuery.isLoading}
-            isError={Boolean(draftQuery.error)}
-            onEdit={openEdit}
-          />
-        ) : (
-          <AllocationTable
-            rows={publishedRows}
-            isLoading={publishedQuery.isLoading}
-            isError={Boolean(publishedQuery.error)}
-          />
-        )}
+        <AllocationTable
+          rows={displayedRows}
+          isLoading={tab === "draft" ? draftQuery.isLoading : publishedQuery.isLoading}
+          isError={tab === "draft" ? Boolean(draftQuery.error) : Boolean(publishedQuery.error)}
+          onEdit={openEdit}
+          emptyLabel={tab === "published" ? "Nothing published yet." : undefined}
+        />
       </div>
 
       <ReassignAllocationModal
@@ -534,6 +505,34 @@ export function AllocationsPanel() {
         onTeacherIdChange={setTeacherId}
         onTeacherLabelChange={setTeacherLabel}
         onRoomIdChange={setRoomId}
+      />
+
+      <ConfirmModal
+        open={Boolean(confirmAction)}
+        title={
+          confirmAction === "generate"
+            ? "Generate Draft Routine"
+            : confirmAction === "publish"
+            ? "Publish Routine"
+            : "Clear Draft Routine"
+        }
+        message={
+          confirmAction === "generate"
+            ? "Generate a fresh DRAFT routine? This replaces any existing draft (published duties remain untouched)."
+            : confirmAction === "publish"
+            ? "Publish the draft routine? Assigned teachers will be notified by email."
+            : "Clear the draft routine? All draft duties will be removed. Published duties are kept."
+        }
+        confirmLabel={
+          confirmAction === "generate"
+            ? "Generate"
+            : confirmAction === "publish"
+            ? "Publish"
+            : "Clear Draft"
+        }
+        busy={generating || publishing || clearing}
+        onClose={() => setConfirmAction(null)}
+        onConfirm={() => void onConfirmAction()}
       />
     </div>
   );

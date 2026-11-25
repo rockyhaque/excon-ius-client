@@ -1,4 +1,5 @@
 import "@/styles/teacher.css";
+import { LoadingSpinner } from "@/components/ui/Loading";
 import { useMemo } from "react";
 import { useGetRulesQuery } from "@/redux/features/allocations/allocations.api";
 import { useSkipTeacherApi } from "@/hooks/useTeacherProfile";
@@ -49,7 +50,7 @@ export function TeacherRulesCard() {
         {skipApi ? (
           <p className="foundations__muted">Sign in to load the rules.</p>
         ) : isLoading ? (
-          <p className="foundations__muted">Loading…</p>
+          <LoadingSpinner />
         ) : error ? (
           <p className="foundations__error">Could not load rules.</p>
         ) : grouped.length === 0 ? (

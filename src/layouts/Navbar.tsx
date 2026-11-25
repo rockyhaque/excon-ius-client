@@ -1,4 +1,5 @@
 import { NavLink, useNavigate } from "react-router-dom";
+import { LoadingSpinner } from "@/components/ui/Loading";
 import { useAuth } from "@/hooks/useAuth";
 import { normalizeRoleForRoute, role } from "@/constants/role";
 import "@/styles/navbar.css";
@@ -44,7 +45,7 @@ export function Navbar() {
 
         <div className="nav__right">
           {isLoading ? (
-            <span className="nav__muted">Checking session…</span>
+            <LoadingSpinner compact light size={18} />
           ) : isAuthenticated ? (
             <>
               <span className="nav__user" title={user?.email ?? ""}>

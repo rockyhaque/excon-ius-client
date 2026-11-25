@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { LoadingSpinner } from "@/components/ui/Loading";
 import { Modal } from "@/components/ui/Modal";
 import { ConfirmModal } from "@/components/ui/ConfirmModal";
 import { getErrorMessage } from "@/utils/getErrorMessage";
@@ -82,6 +83,7 @@ export function SectionsPanel() {
   const [pendingDelete, setPendingDelete] = useState<Section | null>(null);
   const [batchId, setBatchId] = useState<string>("");
   const [name, setName] = useState("");
+  const [studentsCount, setStudentsCount] = useState<number>(40);
   const [formError, setFormError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -92,6 +94,7 @@ export function SectionsPanel() {
     setEditing(null);
     setBatchId(String(batchOptions[0]?.id ?? ""));
     setName("");
+    setStudentsCount(40);
     setFormError(null);
     setOpen(true);
   };
@@ -100,6 +103,7 @@ export function SectionsPanel() {
     setEditing(s);
     setBatchId(String(s.batch_id));
     setName(s.name);
+    setStudentsCount(s.students_count || 40);
     setFormError(null);
     setOpen(true);
   };
@@ -111,7 +115,7 @@ export function SectionsPanel() {
       return;
     }
     try {
-      const payload = { batch_id: batchId, name: name.trim() };
+      const payload = { batch_id: batchId, name: name.trim(), students_count: studentsCount };
       if (editing) await updateSection({ id: editing.id, data: payload }).unwrap();
       else await createSection(payload).unwrap();
       setOpen(false);
@@ -186,29 +190,30 @@ export function SectionsPanel() {
         </div>
       </div>
 
-      {isLoading ? <p className="foundations__muted">Loading…</p> : null}
+      {isLoading ? <LoadingSpinner /> : null}
       {error ? <p className="foundations__error">Could not load sections.</p> : null}
 
-      <div className="foundations__table-wrap">
+      <div className="foundations__table-wrap" hidden={isLoading}>
         <table className="foundations__table">
           <thead>
             <tr>
               <SortableTh label="Department" sortKey="dept" sort={sort} onSort={onSort} />
               <SortableTh label="Batch" sortKey="batch" sort={sort} onSort={onSort} />
               <SortableTh label="Section" sortKey="section" sort={sort} onSort={onSort} />
+              <th>Students</th>
               <th style={{ width: 160 }}>Actions</th>
             </tr>
           </thead>
           <tbody>
-            {rows.length === 0 ? (
+            {isLoading ? null : rows.length === 0 ? (
               <tr>
-                <td colSpan={4} className="foundations__empty">
+                <td colSpan={5} className="foundations__empty">
                   No sections yet.
                 </td>
               </tr>
             ) : viewRows.length === 0 ? (
               <tr>
-                <td colSpan={4} className="foundations__empty">
+                <td colSpan={5} className="foundations__empty">
                   No sections match these filters.
                 </td>
               </tr>
@@ -219,6 +224,9 @@ export function SectionsPanel() {
                   <td>{s.batch_name || "—"}</td>
                   <td>
                     <strong>{s.name}</strong>
+                  </td>
+                  <td>
+                    <span style={{ fontWeight: 600 }}>{s.students_count || 40}</span>
                   </td>
                   <td>
                     <div className="foundations__actions">
@@ -272,6 +280,17 @@ export function SectionsPanel() {
           <label className="foundations__field">
             <span>Section name</span>
             <input value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. A" />
+          </label>
+          <label className="foundations__field">
+            <span>Student count</span>
+            <input
+              type="number"
+              value={studentsCount}
+              onChange={(e) => setStudentsCount(Math.max(1, Number(e.target.value)))}
+              min={1}
+              step={1}
+              placeholder="e.g. 40"
+            />
           </label>
           {formError ? <div className="foundations__error">{formError}</div> : null}
         </div>

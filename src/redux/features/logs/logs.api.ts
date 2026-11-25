@@ -36,8 +36,12 @@ function normalizeListResponse(res: unknown): LogRow[] {
 
 export const logsApi = baseApi.injectEndpoints({
   endpoints: (builder) => ({
-    getActivityLogs: builder.query<LogRow[], void>({
-      query: () => ({ url: "/logs/activity", method: "GET" }),
+    getActivityLogs: builder.query<LogRow[], { exclude?: string } | void>({
+      query: (params) => ({
+        url: "/logs/activity",
+        method: "GET",
+        params: params?.exclude ? { exclude: params.exclude } : undefined,
+      }),
       transformResponse: normalizeListResponse,
       providesTags: ["LOGS"],
     }),

@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { LoadingSpinner } from "@/components/ui/Loading";
 import { Modal } from "@/components/ui/Modal";
 import { ConfirmModal } from "@/components/ui/ConfirmModal";
 import { getErrorMessage } from "@/utils/getErrorMessage";
@@ -152,10 +153,10 @@ export function BatchesPanel() {
         </div>
       </div>
 
-      {isLoading ? <p className="foundations__muted">Loading…</p> : null}
+      {isLoading ? <LoadingSpinner /> : null}
       {error ? <p className="foundations__error">Could not load batches.</p> : null}
 
-      <div className="foundations__table-wrap">
+      <div className="foundations__table-wrap" hidden={isLoading}>
         <table className="foundations__table">
           <thead>
             <tr>
@@ -166,7 +167,7 @@ export function BatchesPanel() {
             </tr>
           </thead>
           <tbody>
-            {rows.length === 0 ? (
+            {isLoading ? null : rows.length === 0 ? (
               <tr>
                 <td colSpan={4} className="foundations__empty">
                   No batches yet.

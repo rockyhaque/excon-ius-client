@@ -7,6 +7,7 @@ import { SectionsPanel } from "@/components/foundations/SectionsPanel";
 import { CoursesPanel } from "@/components/foundations/CoursesPanel";
 import { SemestersPanel } from "@/components/foundations/SemestersPanel";
 import { CreditsPanel } from "@/components/foundations/CreditsPanel";
+import { RoomsPanel } from "@/components/exam-room/RoomsPanel";
 import {
   useGetBatchesQuery,
   useGetCoursesQuery,
@@ -14,9 +15,10 @@ import {
   useGetSectionsQuery,
   useGetSemestersQuery,
 } from "@/redux/features/foundations/foundations.api";
+import { useGetRoomsQuery } from "@/redux/features/exam-room/examRoom.api";
 import { mapBatches, mapCourses, mapDepartments, mapSections } from "@/components/foundations/foundations.types";
 
-type FoundationsTab = "departments" | "batches" | "sections" | "courses" | "semesters" | "credits";
+type FoundationsTab = "departments" | "batches" | "sections" | "courses" | "semesters" | "rooms" | "credits";
 
 const TAB_LABEL: Record<FoundationsTab, string> = {
   departments: "Departments",
@@ -24,6 +26,7 @@ const TAB_LABEL: Record<FoundationsTab, string> = {
   sections: "Sections",
   courses: "Courses",
   semesters: "Semesters",
+  rooms: "Rooms & Columns",
   credits: "Credits",
 };
 
@@ -35,17 +38,22 @@ export function FoundationsManager() {
   const { data: sectionsRaw = [] } = useGetSectionsQuery({ limit: 500 });
   const { data: coursesRaw = [] } = useGetCoursesQuery({ limit: 1000 });
   const { data: semestersRaw = [] } = useGetSemestersQuery();
+  const { data: roomsRaw = [] } = useGetRoomsQuery({ limit: 100 });
 
   const departments = mapDepartments(deptsRaw);
   const batches = mapBatches(batchesRaw);
   const sections = mapSections(sectionsRaw);
   const courses = mapCourses(coursesRaw);
+  const roomsList = Array.isArray(roomsRaw)
+    ? roomsRaw
+    : ((roomsRaw as unknown as { data?: unknown[] })?.data ?? []);
 
   const kpis = [
     { label: "Departments", value: departments.length },
     { label: "Batches", value: batches.length },
     { label: "Sections", value: sections.length },
     { label: "Courses", value: courses.length },
+    { label: "Rooms", value: roomsList.length },
     { label: "Semesters", value: (semestersRaw as unknown[]).length },
   ];
 
@@ -56,7 +64,7 @@ export function FoundationsManager() {
           <div>
             <h1 style={{ margin: 0 }}>Foundations</h1>
             <p className="foundations__lead" style={{ marginTop: 6 }}>
-              Manage departments, batches 1–20, sections, this semester’s courses, and semesters.
+              Manage departments, batches 1–20, sections, this semester’s courses, campus rooms &amp; columns, and semesters.
             </p>
           </div>
         </div>
@@ -95,6 +103,8 @@ export function FoundationsManager() {
           <CoursesPanel />
         ) : tab === "semesters" ? (
           <SemestersPanel />
+        ) : tab === "rooms" ? (
+          <RoomsPanel />
         ) : (
           <CreditsPanel />
         )}

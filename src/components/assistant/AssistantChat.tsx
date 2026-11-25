@@ -1,28 +1,28 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   useGetAssistantStatusQuery,
-  useChatWithAssistantMutation,
   type AssistantTurn,
   type AssistantUsage,
 } from "@/redux/features/assistant/assistant.api";
+import { getAccessToken } from "@/lib/authToken";
+import config from "@/config";
 import { useAuth } from "@/hooks/useAuth";
-import { getErrorMessage } from "@/utils/getErrorMessage";
+import { LoadingSpinner } from "@/components/ui/Loading";
 import "@/styles/assistant.css";
 
-type ChatMessage = { role: "user" | "model"; text: string };
+type ChatMessage = { role: "user" | "model"; text: string; sources?: { label: string }[] };
 
 const ADMIN_SUGGESTIONS = [
-  "Which teacher has the most invigilation duties?",
-  "Is anyone assigned over their duty limit?",
-  "List the next 3 exams with date, time and room.",
-  "Who is on leave this week?",
+  "Who is invigilating on the next exam day?",
+  "Which teachers have two duties on the same day?",
+  "Who has approved leave during the exams?",
+  "Are any HODs assigned invigilation?",
 ];
 
 const TEACHER_SUGGESTIONS = [
   "What are my upcoming invigilation duties?",
-  "When is my next duty and in which room?",
-  "What is the exam routine for this week?",
-  "What are the leaves I have on record?",
+  "When is my next duty and which room?",
+  "Do I have any approved leave coming up?",
 ];
 
 /** Compact circular meter of the daily message allowance — a "fuel gauge" that empties as it's used. */
@@ -117,15 +117,18 @@ function UsageRing({ limit, remaining }: AssistantUsage) {
 export function AssistantChat() {
   const { user, role } = useAuth();
   const isTeacher = role === "TEACHER";
-  const suggestions = isTeacher ? TEACHER_SUGGESTIONS : ADMIN_SUGGESTIONS;
-
   const { data: status, isLoading: statusLoading } = useGetAssistantStatusQuery();
-  const [chat, { isLoading: sending }] = useChatWithAssistantMutation();
+  const suggestions = status?.suggestions?.length
+    ? status.suggestions
+    : isTeacher
+      ? TEACHER_SUGGESTIONS
+      : ADMIN_SUGGESTIONS;
 
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [usage, setUsage] = useState<AssistantUsage | null>(null);
+  const [sending, setSending] = useState(false);
 
   // Seed the daily-usage counter from the status endpoint (and whenever it refetches).
   useEffect(() => {
@@ -153,21 +156,72 @@ export function AssistantChat() {
     // Snapshot history BEFORE appending the new turn (what the server should see as prior context).
     const history: AssistantTurn[] = messages.slice(-10).map((m) => ({ role: m.role, text: m.text }));
 
-    setMessages((prev) => [...prev, { role: "user", text: message }]);
+    setMessages((prev) => [...prev, { role: "user", text: message }, { role: "model", text: "" }]);
     setInput("");
+    setSending(true);
+
+    const patchLast = (patch: Partial<ChatMessage>) => {
+      setMessages((prev) => {
+        const next = prev.slice();
+        const last = next[next.length - 1];
+        if (!last || last.role !== "model") return prev;
+        next[next.length - 1] = { ...last, ...patch, text: patch.text !== undefined ? patch.text : last.text };
+        if (patch.sources) next[next.length - 1].sources = patch.sources;
+        return next;
+      });
+    };
 
     try {
-      const res = await chat({ message, history }).unwrap();
-      setMessages((prev) => [...prev, { role: "model", text: res.answer }]);
-      if (res.usage) setUsage(res.usage);
-    } catch (err) {
-      const msg = getErrorMessage(err, "The assistant could not answer that. Please try again.");
-      // A 429 means the daily cap was hit — reflect that in the counter so the input locks.
-      if ((err as { status?: number })?.status === 429) {
-        setUsage((u) => (u ? { ...u, used: u.limit, remaining: 0 } : u));
+      const res = await fetch(`${config.baseUrl}/assistant/chat/stream`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${getAccessToken() || ""}`,
+        },
+        credentials: "include",
+        body: JSON.stringify({ message, history }),
+      });
+      if (!res.ok || !res.body) {
+        const data = (await res.json().catch(() => ({}))) as { message?: string };
+        if (res.status === 429) setUsage((u) => (u ? { ...u, used: u.limit, remaining: 0 } : u));
+        throw new Error(data.message || "The assistant could not answer that. Please try again.");
       }
+
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      let buf = "";
+      let event = "";
+      let acc = "";
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buf += decoder.decode(value, { stream: true });
+        const lines = buf.split("\n");
+        buf = lines.pop() || "";
+        for (const line of lines) {
+          if (line.startsWith("event:")) event = line.slice(6).trim();
+          else if (line.startsWith("data:")) {
+            const data = JSON.parse(line.slice(5).trim()) as {
+              text?: string;
+              sources?: { label: string }[];
+              usage?: AssistantUsage;
+              message?: string;
+            };
+            if (event === "sources" && data.sources) patchLast({ sources: data.sources });
+            else if (event === "token" && data.text) {
+              acc += data.text;
+              patchLast({ text: acc });
+            } else if (event === "done" && data.usage) setUsage(data.usage);
+            else if (event === "error") throw new Error(data.message || "The assistant could not answer that.");
+          }
+        }
+      }
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "The assistant could not answer that. Please try again.";
       setError(msg);
-      setMessages((prev) => [...prev, { role: "model", text: `⚠️ ${msg}` }]);
+      patchLast({ text: `⚠️ ${msg}` });
+    } finally {
+      setSending(false);
     }
   };
 
@@ -244,17 +298,27 @@ export function AssistantChat() {
               </div>
             </div>
           ) : (
-            messages.map((m, i) => (
+            messages.map((m, i) => {
+              if (m.role === "model" && !m.text) return null;
+              return (
               <div
                 key={i}
                 className={`assistant__msg assistant__msg--${m.role === "user" ? "user" : "bot"}`}
               >
                 <div className="assistant__bubble">{m.text}</div>
+                {m.role === "model" && m.sources && m.sources.length > 0 ? (
+                  <ul className="assistant__sources">
+                    {m.sources.map((s, si) => (
+                      <li key={`${s.label}-${si}`}>{s.label}</li>
+                    ))}
+                  </ul>
+                ) : null}
               </div>
-            ))
+              );
+            })
           )}
 
-          {sending && (
+          {sending && messages[messages.length - 1]?.text === "" && (
             <div className="assistant__msg assistant__msg--bot">
               <div className="assistant__bubble assistant__bubble--typing">
                 <span></span>
@@ -282,7 +346,7 @@ export function AssistantChat() {
             disabled={sending || limitReached}
           />
           <button type="submit" className="btn assistant__send" disabled={sending || limitReached || !input.trim()}>
-            {sending ? "…" : "Send"}
+            {sending ? <LoadingSpinner compact light size={16} /> : "Send"}
           </button>
         </form>
         <p className="assistant__disclaimer">

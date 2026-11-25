@@ -1,11 +1,9 @@
 import "@/styles/teacher.css";
-import { useGetPublishedAllocationsQuery } from "@/redux/features/allocations/allocations.api";
+import { useGetMyAllocationsQuery } from "@/redux/features/allocations/allocations.api";
 import { useGetLeaveHistoryQuery } from "@/redux/features/leaves/leaves.api";
 import { useTeacherProfile, useSkipTeacherApi } from "@/hooks/useTeacherProfile";
 import { TeacherProfileCard } from "@/components/teacher/TeacherProfileCard";
 import { TeacherOverviewStats } from "@/components/teacher/TeacherOverviewStats";
-import { TeacherDutyCharts } from "@/components/teacher/TeacherDutyCharts";
-import { TeacherLeaveStats } from "@/components/teacher/TeacherLeaveStats";
 import { TeacherRulesCard } from "@/components/teacher/TeacherRulesCard";
 import { TeacherExamsSnippet } from "@/components/teacher/TeacherExamsSnippet";
 import type { PublishedAllocationRow } from "@/types/teacher";
@@ -16,17 +14,17 @@ export function TeacherOverview() {
   const { profile, isLoading, teacherId } = useTeacherProfile();
 
   const {
-    data: published = [],
+    data: myDuties = [],
     isLoading: isLoadingAllocations,
     error: allocationsError,
-  } = useGetPublishedAllocationsQuery(undefined, { skip: skipApi });
+  } = useGetMyAllocationsQuery(undefined, { skip: skipApi });
   const {
     data: leaveHistory = [],
     isLoading: isLoadingLeaves,
     error: leavesError,
   } = useGetLeaveHistoryQuery(undefined, { skip: skipApi });
 
-  const myDuties = (published as PublishedAllocationRow[]).filter((a) => teacherId && a.teacher_id === teacherId);
+  const duties = (myDuties as PublishedAllocationRow[]).filter((a) => !teacherId || a.teacher_id === teacherId);
   const leaves = leaveHistory as TeacherLeaveRow[];
 
   return (
@@ -48,21 +46,31 @@ export function TeacherOverview() {
       </div>
 
       <TeacherOverviewStats
-        myDuties={myDuties}
+        myDuties={duties}
         leaves={leaves}
-        isAvailable={profile?.is_available}
         isLoading={isLoading || isLoadingAllocations || isLoadingLeaves}
       />
 
-      <TeacherDutyCharts myDuties={myDuties} />
-
-      <TeacherLeaveStats leaves={leaves} />
-
-      <TeacherProfileCard profile={profile} isLoading={isLoading} />
+      <TeacherProfileCard
+        profile={profile}
+        isLoading={isLoading}
+        onLeave={leaves.some((l) => {
+          if (String(l.status).toUpperCase() !== "APPROVED") return false;
+          const today = new Date();
+          today.setHours(0, 0, 0, 0);
+          const end = new Date(String(l.end_date ?? "").slice(0, 10));
+          return !isNaN(end.getTime()) && end >= today;
+        })}
+      />
 
       <TeacherRulesCard />
 
-      <TeacherExamsSnippet />
+      <TeacherExamsSnippet
+        duties={duties}
+        isLoading={isLoadingAllocations}
+        error={allocationsError}
+        skipApi={skipApi}
+      />
     </div>
   );
 }

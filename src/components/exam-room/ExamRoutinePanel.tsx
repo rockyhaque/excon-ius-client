@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { toast } from "react-toastify";
 import "@/styles/overview.css";
 import "@/styles/foundations.css";
+import { LoadingSpinner } from "@/components/ui/Loading";
 import { ConfirmModal } from "@/components/ui/ConfirmModal";
 import { getErrorMessage } from "@/utils/getErrorMessage";
 import { useGetSemestersQuery, useGetDepartmentsQuery, useGetBatchesQuery } from "@/redux/features/foundations/foundations.api";
@@ -18,6 +19,7 @@ import { deptsOf, downloadCsv, printOfficialRoutine, officialTableRows, stampNam
 import { RoutineBoard } from "@/components/exam-room/RoutineBoard";
 import { EditExamModal, GenerateRoutineModal } from "@/components/exam-room/ExamRoutineModals";
 import { OfficialRoutineView } from "@/components/exam-room/OfficialRoutineView";
+import { RoomSeatingModal } from "@/components/exam-room/RoomSeatingModal";
 import {
   arr,
   fmtBoardDay,
@@ -27,7 +29,11 @@ import {
   type Semester,
 } from "@/components/exam-room/examRoutine.types";
 
-export function ExamRoutinePanel() {
+interface ExamRoutinePanelProps {
+  onOpenSeating?: () => void;
+}
+
+export function ExamRoutinePanel({ onOpenSeating }: ExamRoutinePanelProps = {}) {
   const { data: semRaw } = useGetSemestersQuery();
   const semesters = useMemo<Semester[]>(
     () => arr(semRaw).map((x) => ({ id: s(x.id), name: s(x.name), season: s(x.season), year: s(x.year) })),
@@ -47,6 +53,7 @@ export function ExamRoutinePanel() {
   const [viewType, setViewType] = useState<ExamType | "">("");
   const [deptFilter, setDeptFilter] = useState("");
   const [routineView, setRoutineView] = useState<"list" | "board">("list");
+  const [seatingModalOpen, setSeatingModalOpen] = useState(false);
 
   useEffect(() => {
     if (!semesterId && semesters.length > 0) {
@@ -149,6 +156,7 @@ export function ExamRoutinePanel() {
   const [endDate, setEndDate] = useState("");
   const [slots, setSlots] = useState<{ start: string; end: string }[]>([{ start: "09:00", end: "12:00" }]);
   const [studentsPerSection, setStudentsPerSection] = useState(40);
+  const [gapDays, setGapDays] = useState(1);
 
   const updateSlot = (i: number, field: "start" | "end", val: string) =>
     setSlots((prev) => prev.map((sl, idx) => (idx === i ? { ...sl, [field]: val } : sl)));
@@ -164,6 +172,7 @@ export function ExamRoutinePanel() {
     });
   const [replace, setReplace] = useState(false);
   const [genError, setGenError] = useState<string | null>(null);
+  const [pendingRegenWarning, setPendingRegenWarning] = useState<string | null>(null);
 
   const genBatches = useMemo(
     () => {
@@ -201,13 +210,19 @@ export function ExamRoutinePanel() {
     });
 
   const openGenerate = () => {
-    setGenSem(semesterId || semesters[0]?.id || "");
+    const defaultSem =
+      semesterId ||
+      semesters.find((sm) => arr(semRaw).find((r) => r.id === sm.id && r.is_current))?.id ||
+      semesters[0]?.id ||
+      "";
+    setGenSem(defaultSem);
     setExamType((viewType as ExamType) || "MIDTERM");
     setGenDept("");
     setStartDate("");
     setEndDate("");
     setSlots([{ start: "09:00", end: "12:00" }]);
     setStudentsPerSection(40);
+    setGapDays(1);
     setSkipDays(new Set([5, 6]));
     setReplace(false);
     setGenError(null);
@@ -244,7 +259,7 @@ export function ExamRoutinePanel() {
       }
     }
     try {
-      const sid = genSem;
+      const sid = genSem || semesterId || semesters[0]?.id || "";
       if (!sid) return setGenError("Choose a semester. Create one in Foundations → Semesters if there are none.");
       const doGenerate = (confirmReplace: boolean) =>
         generate({
@@ -259,6 +274,7 @@ export function ExamRoutinePanel() {
           ...(genDept ? { dept_id: genDept } : {}),
           batch_ids: [...selectedBatchIds],
           students_per_section: studentsPerSection,
+          gap_days: gapDays,
         }).unwrap();
 
       let res;
@@ -268,15 +284,44 @@ export function ExamRoutinePanel() {
         const status = (e as { status?: number })?.status;
         if (replace && status === 409) {
           const warning = getErrorMessage(e, "Regenerating will delete existing exams and their invigilation duties.");
-          if (!window.confirm(`${warning}\n\nDelete them and regenerate?`)) {
-            setGenError("Regeneration cancelled — nothing was changed.");
-            return;
-          }
-          res = await doGenerate(true);
+          setPendingRegenWarning(warning);
+          return;
         } else {
           throw e;
         }
       }
+
+      setSemesterId(sid);
+      setViewType(examType);
+      setGenOpen(false);
+      toast.success(res.message ?? "Exam routine generated.");
+    } catch (e: unknown) {
+      const msg = getErrorMessage(e, "Could not generate routine.");
+      setGenError(msg);
+      toast.error(msg);
+    }
+  };
+
+  const confirmRegenerate = async () => {
+    setPendingRegenWarning(null);
+    const sid = genSem || semesterId || semesters[0]?.id || "";
+    if (!sid) return;
+    const sortedSlots = [...slots].sort((a, b) => a.start.localeCompare(b.start));
+    try {
+      const res = await generate({
+        semester_id: sid,
+        exam_type: examType,
+        start_date: startDate,
+        end_date: endDate,
+        slots: sortedSlots.map((sl) => ({ start_time: sl.start, end_time: sl.end })),
+        skip_days: [...skipDays],
+        replace: true,
+        confirm_replace: true,
+        ...(genDept ? { dept_id: genDept } : {}),
+        batch_ids: [...selectedBatchIds],
+        students_per_section: studentsPerSection,
+        gap_days: gapDays,
+      }).unwrap();
 
       setSemesterId(sid);
       setViewType(examType);
@@ -495,6 +540,21 @@ export function ExamRoutinePanel() {
           <button className="foundations__btn foundations__btn--ghost" type="button" onClick={exportCsv} disabled={viewRows.length === 0}>
             Export CSV
           </button>
+          <button
+            className="foundations__btn foundations__btn--ghost"
+            type="button"
+            onClick={() => {
+              if (onOpenSeating) {
+                onOpenSeating();
+              } else {
+                setSeatingModalOpen(true);
+              }
+            }}
+            disabled={rows.length === 0}
+            style={{ fontWeight: 600, color: "#2563eb", borderColor: "#bfdbfe" }}
+          >
+            Seating Plan (Columns)
+          </button>
           <button className="foundations__btn" type="button" onClick={openGenerate} disabled={generating}>
             {generating ? "Generating…" : "Generate routine"}
           </button>
@@ -509,7 +569,7 @@ export function ExamRoutinePanel() {
         </div>
       </div>
 
-      {isLoading ? <p className="foundations__muted">Loading…</p> : null}
+      {isLoading ? <LoadingSpinner /> : null}
       {error ? <p className="foundations__error">Could not load the routine.</p> : null}
       {!isLoading && semesterId && rows.length === 0 ? (
         <div className="foundations__empty" style={{ border: "1px solid #e5e7eb", borderRadius: 12, background: "#fff" }}>
@@ -576,9 +636,11 @@ export function ExamRoutinePanel() {
         endDate={endDate}
         slots={slots}
         studentsPerSection={studentsPerSection}
+        gapDays={gapDays}
         skipDays={skipDays}
         replace={replace}
         genError={genError}
+        roomOptions={roomOptions}
         onClose={() => setGenOpen(false)}
         onSubmit={() => void submitGenerate()}
         onGenSemChange={setGenSem}
@@ -588,6 +650,7 @@ export function ExamRoutinePanel() {
         onSetManyBatches={setManyBatches}
         onStartDateChange={setStartDate}
         onEndDateChange={setEndDate}
+        onGapDaysChange={setGapDays}
         onUpdateSlot={updateSlot}
         onAddSlot={addSlot}
         onRemoveSlot={removeSlot}
@@ -633,6 +696,23 @@ export function ExamRoutinePanel() {
         busy={deletingRoutine}
         onClose={() => setPendingDeleteRoutine(false)}
         onConfirm={() => void confirmDeleteRoutine()}
+      />
+      <ConfirmModal
+        open={Boolean(pendingRegenWarning)}
+        title="Replace Existing Routine?"
+        message={`${pendingRegenWarning ?? ""}\n\nDelete them and regenerate?`}
+        confirmLabel="Replace & Regenerate"
+        busy={generating}
+        onClose={() => {
+          setPendingRegenWarning(null);
+          setGenError("Regeneration cancelled — nothing was changed.");
+        }}
+        onConfirm={() => void confirmRegenerate()}
+      />
+      <RoomSeatingModal
+        open={seatingModalOpen}
+        onClose={() => setSeatingModalOpen(false)}
+        semesterId={semesterId}
       />
     </>
   );

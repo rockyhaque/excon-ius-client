@@ -2,6 +2,8 @@ import { useMemo, useState } from "react";
 import { toast } from "react-toastify";
 import "@/styles/overview.css";
 import { getErrorMessage } from "@/utils/getErrorMessage";
+import { LoadingSpinner } from "@/components/ui/Loading";
+import { ConfirmModal } from "@/components/ui/ConfirmModal";
 import {
   useApproveLeaveMutation,
   useGetLeaveHistoryQuery,
@@ -82,24 +84,29 @@ export function AdminLeaveRequestsPanel() {
 
   const [approve, { isLoading: approving }] = useApproveLeaveMutation();
   const [reject, { isLoading: rejecting }] = useRejectLeaveMutation();
+  const [pendingAction, setPendingAction] = useState<{ type: "approve" | "reject"; row: LeaveRow } | null>(null);
 
-  const onApprove = async (row: LeaveRow) => {
-    if (!window.confirm(`Approve leave for ${row.teacher_name ?? "teacher"}?`)) return;
+  const confirmAction = async () => {
+    if (!pendingAction) return;
+    const { type, row } = pendingAction;
     try {
-      await approve(row.id).unwrap();
-      toast.success("Leave approved.");
+      if (type === "approve") {
+        const updated = await approve(row.id).unwrap();
+        const moved = Array.isArray((updated as { reassigned?: unknown[] }).reassigned)
+          ? (updated as { reassigned: unknown[] }).reassigned.length
+          : 0;
+        toast.success(
+          moved > 0
+            ? `Leave approved. ${moved} dut${moved === 1 ? "y" : "ies"} moved to a teacher with no duty that day.`
+            : "Leave approved. This teacher had no invigilation duty on those dates.",
+        );
+      } else {
+        await reject(row.id).unwrap();
+        toast.success("Leave rejected.");
+      }
+      setPendingAction(null);
     } catch (err: unknown) {
-      toast.error(getErrorMessage(err, "Could not approve leave."));
-    }
-  };
-
-  const onReject = async (row: LeaveRow) => {
-    if (!window.confirm(`Reject leave for ${row.teacher_name ?? "teacher"}?`)) return;
-    try {
-      await reject(row.id).unwrap();
-      toast.success("Leave rejected.");
-    } catch (err: unknown) {
-      toast.error(getErrorMessage(err, "Could not reject leave."));
+      toast.error(getErrorMessage(err, `Could not ${type} leave.`));
     }
   };
 
@@ -177,10 +184,10 @@ export function AdminLeaveRequestsPanel() {
           </button>
         </div>
 
-        {isLoading ? <p className="foundations__muted">Loading…</p> : null}
+        {isLoading ? <LoadingSpinner /> : null}
         {error ? <p className="foundations__error">Could not load leave requests.</p> : null}
 
-        <div className="foundations__table-wrap">
+        <div className="foundations__table-wrap" hidden={isLoading}>
           <table className="foundations__table">
             <thead>
               <tr>
@@ -191,7 +198,7 @@ export function AdminLeaveRequestsPanel() {
               </tr>
             </thead>
             <tbody>
-              {rows.length === 0 ? (
+              {!isLoading && rows.length === 0 ? (
                 <tr>
                 <td colSpan={4} className="foundations__empty">
                     {tab === "pending" ? "No pending leave requests." : "No leave history yet."}
@@ -222,7 +229,7 @@ export function AdminLeaveRequestsPanel() {
                               type="button"
                               className="foundations__btn foundations__btn--ghost"
                               disabled={approving || rejecting}
-                              onClick={() => void onApprove(r)}
+                              onClick={() => setPendingAction({ type: "approve", row: r })}
                             >
                               Approve
                             </button>
@@ -230,7 +237,7 @@ export function AdminLeaveRequestsPanel() {
                               type="button"
                               className="foundations__danger"
                               disabled={approving || rejecting}
-                              onClick={() => void onReject(r)}
+                              onClick={() => setPendingAction({ type: "reject", row: r })}
                             >
                               Reject
                             </button>
@@ -247,6 +254,20 @@ export function AdminLeaveRequestsPanel() {
           </table>
         </div>
       </div>
+
+      <ConfirmModal
+        open={Boolean(pendingAction)}
+        title={pendingAction?.type === "approve" ? "Approve Leave" : "Reject Leave"}
+        message={
+          pendingAction
+            ? `${pendingAction.type === "approve" ? "Approve" : "Reject"} leave request for ${pendingAction.row.teacher_name ?? "teacher"} (${fmtDate(pendingAction.row.start_date)} → ${fmtDate(pendingAction.row.end_date)})?`
+            : ""
+        }
+        confirmLabel={pendingAction?.type === "approve" ? "Approve" : "Reject"}
+        busy={approving || rejecting}
+        onClose={() => setPendingAction(null)}
+        onConfirm={() => void confirmAction()}
+      />
     </div>
   );
 }

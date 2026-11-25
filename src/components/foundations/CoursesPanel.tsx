@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { LoadingSpinner } from "@/components/ui/Loading";
 import { Modal } from "@/components/ui/Modal";
 import { ConfirmModal } from "@/components/ui/ConfirmModal";
 import { getErrorMessage } from "@/utils/getErrorMessage";
@@ -318,21 +319,26 @@ export function CoursesPanel() {
             <span className="foundations__muted" style={{ margin: 0 }}>
               {currentSemester ? currentSemester.name : "No current semester"}
               {selectedBatch ? ` · ${batchOptionLabel(selectedBatch)}` : ""}
-              {loadingOffered
-                ? " · Loading…"
-                : ` · ${creditsUsed} / ${maxCredits} credits this semester`}
+              {loadingOffered ? (
+                <>
+                  {" · "}
+                  <LoadingSpinner compact size={14} />
+                </>
+              ) : (
+                ` · ${creditsUsed} / ${maxCredits} credits this semester`
+              )}
             </span>
           </div>
         </div>
       ) : null}
 
-      {loadingCatalog && !filterBatchId ? <p className="foundations__muted">Loading…</p> : null}
+      {loadingCatalog && !filterBatchId ? <LoadingSpinner /> : null}
       {deptOptions.length === 0 ? <p className="foundations__muted">Create a department first.</p> : null}
       {!currentSemester ? (
         <p className="foundations__error">Set a current semester in Semesters before offering courses.</p>
       ) : null}
 
-      <div className="foundations__table-wrap">
+      <div className="foundations__table-wrap" hidden={loadingCatalog && !filterBatchId}>
         <table className="foundations__table">
           <thead>
             <tr>

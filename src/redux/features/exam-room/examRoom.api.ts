@@ -30,6 +30,8 @@ export const examRoomApi = baseApi.injectEndpoints({
         dept_id?: string;
         /** Scope generation to specific batches; omit for every batch in scope. */
         batch_ids?: string[];
+        /** Study gap in days between consecutive exams for the same batch (default: 1). */
+        gap_days?: number;
       }
     >({
       query: (data) => ({ url: "/exam-room/exams/generate-routine", method: "POST", data }),
@@ -106,6 +108,10 @@ export const examRoomApi = baseApi.injectEndpoints({
       }),
       invalidatesTags: ["EXAMS", "ROOMS", "ALLOCATIONS"],
     }),
+    getExamSeating: builder.query<any[], void | Record<string, unknown>>({
+      query: (params) => ({ url: "/exam-room/seating", method: "GET", params: params ?? undefined }),
+      providesTags: ["EXAMS", "ROOMS"],
+    }),
   }),
 });
 
@@ -123,4 +129,5 @@ export const {
   useUpdateRoomMutation,
   useDeleteRoomMutation,
   useAssignRoomToExamMutation,
+  useGetExamSeatingQuery,
 } = examRoomApi;

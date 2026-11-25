@@ -1,6 +1,8 @@
 import { useState } from "react";
 import "@/styles/teacher.css";
+import { LoadingSpinner } from "@/components/ui/Loading";
 import { Modal } from "@/components/ui/Modal";
+import { ConfirmModal } from "@/components/ui/ConfirmModal";
 import { Tabs } from "@/components/ui/Tabs";
 import { PageCard } from "@/components/ui/PageCard";
 import { EmptyRow, Table } from "@/components/ui/Table";
@@ -29,10 +31,14 @@ export function TeacherLeavesPanel() {
 
   const [tab, setTab] = useState<"list" | "apply">("list");
   const [open, setOpen] = useState(false);
+  const [pendingCancelId, setPendingCancelId] = useState<string | null>(null);
   const [start, setStart] = useState("");
   const [end, setEnd] = useState("");
+  const [cause, setCause] = useState("Sick");
   const [reason, setReason] = useState("");
   const [formError, setFormError] = useState<string | null>(null);
+
+  const CAUSES = ["Sick", "Personal", "Family", "Official", "Other"] as const;
 
   const submit = async () => {
     if (skipApi) return;
@@ -42,9 +48,12 @@ export function TeacherLeavesPanel() {
       return;
     }
     try {
-      await apply({ start_date: start, end_date: end, reason: reason || undefined }).unwrap();
+      const detail = reason.trim();
+      const reasonText = detail ? `${cause} — ${detail}` : cause;
+      await apply({ start_date: start, end_date: end, reason: reasonText }).unwrap();
       setStart("");
       setEnd("");
+      setCause("Sick");
       setReason("");
       setOpen(false);
       setTab("list");
@@ -105,10 +114,11 @@ export function TeacherLeavesPanel() {
         {tab === "list" ? (
           <>
             {skipApi ? <p className="foundations__muted">Sign in to load your leave history.</p> : null}
-            {!skipApi && isLoading ? <p className="foundations__muted">Loading…</p> : null}
+            {!skipApi && isLoading ? <LoadingSpinner /> : null}
             {!skipApi && error ? <p className="foundations__error">Could not load leave history.</p> : null}
 
             <Table
+              hidden={!skipApi && isLoading}
               head={
                 <thead>
                   <tr>
@@ -137,9 +147,7 @@ export function TeacherLeavesPanel() {
                           type="button"
                           className="foundations__danger"
                           disabled={cancelling}
-                          onClick={() => {
-                            if (window.confirm("Cancel this leave request?")) void onCancel(row.id);
-                          }}
+                          onClick={() => setPendingCancelId(String(row.id))}
                         >
                           Cancel
                         </button>
@@ -185,17 +193,42 @@ export function TeacherLeavesPanel() {
               <input type="date" value={end} onChange={(e) => setEnd(e.target.value)} required />
             </label>
             <label className="foundations__field">
-              <span>Reason (optional)</span>
+              <span>Cause</span>
+              <select value={cause} onChange={(e) => setCause(e.target.value)}>
+                {CAUSES.map((c) => (
+                  <option key={c} value={c}>
+                    {c}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="foundations__field">
+              <span>Details (optional)</span>
               <textarea
                 value={reason}
                 onChange={(e) => setReason(e.target.value)}
-                placeholder="Optional"
+                placeholder="Add a short note if the cause needs one"
                 style={{ minHeight: 90, resize: "vertical", borderRadius: 10, padding: "9px 10px", border: "1px solid #d1d5db", font: "inherit" }}
               />
             </label>
             {formError ? <div className="foundations__error">{formError}</div> : null}
           </div>
         </Modal>
+
+        <ConfirmModal
+          open={Boolean(pendingCancelId)}
+          title="Cancel Leave Request"
+          message="Are you sure you want to cancel this leave request? This cannot be undone."
+          confirmLabel="Cancel Request"
+          busy={cancelling}
+          onClose={() => setPendingCancelId(null)}
+          onConfirm={async () => {
+            if (!pendingCancelId) return;
+            const id = pendingCancelId;
+            setPendingCancelId(null);
+            await onCancel(id);
+          }}
+        />
     </PageCard>
   );
 }

@@ -1,3 +1,4 @@
+import { useMemo } from "react";
 import { Modal } from "@/components/ui/Modal";
 import { BatchMultiSelect } from "@/components/exam-room/BatchMultiSelect";
 import type { Batch } from "@/types/foundations";
@@ -19,9 +20,11 @@ export function GenerateRoutineModal({
   endDate,
   slots,
   studentsPerSection,
+  gapDays,
   skipDays,
   replace,
   genError,
+  roomOptions,
   onClose,
   onSubmit,
   onGenSemChange,
@@ -31,10 +34,11 @@ export function GenerateRoutineModal({
   onSetManyBatches,
   onStartDateChange,
   onEndDateChange,
+  onGapDaysChange,
   onUpdateSlot,
   onAddSlot,
   onRemoveSlot,
-  onStudentsPerSectionChange,
+  onStudentsPerSectionChange: _onStudentsPerSectionChange,
   onToggleSkipDay,
   onReplaceChange,
 }: {
@@ -51,9 +55,11 @@ export function GenerateRoutineModal({
   endDate: string;
   slots: TimeSlot[];
   studentsPerSection: number;
+  gapDays: number;
   skipDays: Set<number>;
   replace: boolean;
   genError: string | null;
+  roomOptions?: RoomOption[];
   onClose: () => void;
   onSubmit: () => void;
   onGenSemChange: (value: string) => void;
@@ -63,6 +69,7 @@ export function GenerateRoutineModal({
   onSetManyBatches: (ids: string[], on: boolean) => void;
   onStartDateChange: (value: string) => void;
   onEndDateChange: (value: string) => void;
+  onGapDaysChange: (value: number) => void;
   onUpdateSlot: (index: number, field: "start" | "end", value: string) => void;
   onAddSlot: () => void;
   onRemoveSlot: (index: number) => void;
@@ -70,6 +77,22 @@ export function GenerateRoutineModal({
   onToggleSkipDay: (day: number) => void;
   onReplaceChange: (value: boolean) => void;
 }) {
+  void _onStudentsPerSectionChange;
+  void roomOptions;
+  void studentsPerSection;
+
+  const availableDaysCount = useMemo(() => {
+    if (!startDate || !endDate || endDate < startDate) return 0;
+    let count = 0;
+    const cur = new Date(startDate + "T00:00:00Z");
+    const end = new Date(endDate + "T00:00:00Z");
+    while (cur <= end) {
+      if (!skipDays.has(cur.getUTCDay())) count++;
+      cur.setUTCDate(cur.getUTCDate() + 1);
+    }
+    return count;
+  }, [startDate, endDate, skipDays]);
+
   return (
     <Modal
       open={open}
@@ -88,9 +111,27 @@ export function GenerateRoutineModal({
       }
     >
       <div className="foundations__form">
+        {genError ? (
+          <div
+            className="foundations__error"
+            style={{
+              whiteSpace: "pre-line",
+              padding: "10px 14px",
+              lineHeight: 1.5,
+              borderRadius: 6,
+              border: "1px solid #fca5a5",
+              backgroundColor: "#fef2f2",
+            }}
+          >
+            {genError}
+          </div>
+        ) : null}
         <label className="foundations__field">
           <span>Semester</span>
-          <select value={genSem} onChange={(e) => onGenSemChange(e.target.value)}>
+          <select
+            value={genSem || semesters[0]?.id || ""}
+            onChange={(e) => onGenSemChange(e.target.value)}
+          >
             {semesters.length === 0 ? <option value="">No semesters yet</option> : null}
             {semesters.map((sm) => (
               <option key={sm.id} value={sm.id}>
@@ -157,6 +198,32 @@ export function GenerateRoutineModal({
           <span>End date</span>
           <input type="date" value={endDate} onChange={(e) => onEndDateChange(e.target.value)} />
         </label>
+        <label className="foundations__field">
+          <span>Study gap between exams (days)</span>
+          <input
+            type="number"
+            min={0}
+            max={14}
+            value={gapDays}
+            onChange={(e) => onGapDaysChange(Math.min(14, Math.max(0, Number(e.target.value) || 0)))}
+          />
+        </label>
+        {startDate && endDate && (
+          <div
+            style={{
+              fontSize: 12.5,
+              color: availableDaysCount === 0 ? "#dc2626" : "#4b5563",
+              margin: "-6px 0 2px",
+              display: "flex",
+              alignItems: "center",
+              gap: 6,
+            }}
+          >
+            <span>
+              📅 Selected range provides <strong>{availableDaysCount} available exam day(s)</strong> (excluding checked skip days).
+            </span>
+          </div>
+        )}
         <div className="foundations__field">
           <span>Daily time slots</span>
           <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
@@ -192,18 +259,8 @@ export function GenerateRoutineModal({
         <p className="foundations__muted" style={{ margin: 0 }}>
           Add a second slot (e.g. an afternoon session) to schedule more exams per day. Slots must not overlap.
         </p>
-        <label className="foundations__field">
-          <span>Students per section (for room seating)</span>
-          <input
-            type="number"
-            min={1}
-            value={studentsPerSection}
-            onChange={(e) => onStudentsPerSectionChange(Number(e.target.value))}
-          />
-        </label>
-
         <p className="foundations__muted" style={{ margin: 0 }}>
-          Rooms are seated by capacity automatically. Teacher invigilation stays in Allocations — not mixed here.
+          Rooms are seated automatically by section student capacities from Foundations. Teacher invigilation stays in Allocations — not mixed here.
         </p>
 
         <div className="foundations__field">

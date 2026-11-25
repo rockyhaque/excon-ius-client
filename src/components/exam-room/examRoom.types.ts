@@ -31,13 +31,31 @@ function toRowArray(input: unknown): ExamRoomEntity[] {
 }
 
 export function mapRooms(rows: unknown): Room[] {
-  return toRowArray(rows).map((r) => ({
-    id: asId(r.id),
-    name: safeStr(r.name),
-    building: safeStr(r.building),
-    capacity: asNum(r.capacity),
-    is_defect: asBool((r as any).is_defect),
-  }));
+  return toRowArray(rows).map((r) => {
+    const rawSeats = (r as any).seats_per_column;
+    const seats_per_column = Array.isArray(rawSeats)
+      ? rawSeats.map(asNum)
+      : typeof rawSeats === "string"
+        ? (() => {
+            try {
+              const p = JSON.parse(rawSeats);
+              return Array.isArray(p) ? p.map(asNum) : undefined;
+            } catch {
+              return undefined;
+            }
+          })()
+        : undefined;
+
+    return {
+      id: asId(r.id),
+      name: safeStr(r.name),
+      building: safeStr(r.building),
+      capacity: asNum(r.capacity),
+      columns_count: asNum((r as any).columns_count) || (seats_per_column?.length ?? 4),
+      seats_per_column,
+      is_defect: asBool((r as any).is_defect),
+    };
+  });
 }
 
 export function mapExams(rows: unknown): Exam[] {
