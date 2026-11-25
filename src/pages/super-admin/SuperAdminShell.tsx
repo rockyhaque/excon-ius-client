@@ -7,7 +7,6 @@ const items = [
   { to: "/super-admin/exams-rooms", label: "Exams & Timetables" },
   { to: "/super-admin/allocations", label: "Allocations" },
   { to: "/super-admin/leaves", label: "Leave Requests" },
-  { to: "/super-admin/assistant", label: "AI Assistant" },
   { to: "/super-admin/logs", label: "Logs" },
 ];
 

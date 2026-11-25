@@ -6,6 +6,7 @@ import { useGetRoomsQuery } from "@/redux/features/exam-room/examRoom.api";
 import { useGetLeaveHistoryQuery, useFetchAvailabilityQuery } from "@/redux/features/leaves/leaves.api";
 import { useGetActivityLogsQuery } from "@/redux/features/logs/logs.api";
 import { ChartCard, DonutChart, HBarList, VIZ } from "@/components/overview/charts";
+import { buildRecentActivity } from "@/components/overview/activityFeed";
 
 const arr = (x: unknown): Record<string, unknown>[] => {
   if (Array.isArray(x)) return x as Record<string, unknown>[];
@@ -16,10 +17,6 @@ const num = (v: unknown) => {
   const n = Number(v);
   return Number.isFinite(n) ? n : 0;
 };
-const fmtTime = (v: unknown) => {
-  const s = String(v ?? "");
-  return s.length >= 16 ? s.replace("T", " ").slice(0, 16) : s.slice(0, 10) || "—";
-};
 
 export function AdminOverviewDashboard() {
   const { data: profile } = useProfileQuery();
@@ -28,7 +25,7 @@ export function AdminOverviewDashboard() {
   const { data: roomsRaw, isLoading: roomsLoading } = useGetRoomsQuery({ limit: 100 });
   const { data: leavesRaw, isLoading: leavesLoading } = useGetLeaveHistoryQuery();
   const { data: availabilityRaw, isLoading: availLoading } = useFetchAvailabilityQuery();
-  const { data: activityRaw } = useGetActivityLogsQuery();
+  const { data: activityRaw, isLoading: activityLoading } = useGetActivityLogsQuery({ exclude: "ASSISTANT_QUERY" });
 
   const role = isSuper ? "Super Admin" : "Admin";
   const stats = (reports?.stats ?? {}) as Record<string, unknown>;
@@ -36,9 +33,28 @@ export function AdminOverviewDashboard() {
   const rooms = useMemo(() => arr(roomsRaw), [roomsRaw]);
   const leaves = useMemo(() => arr(leavesRaw), [leavesRaw]);
   const availability = useMemo(() => arr(availabilityRaw), [availabilityRaw]);
-  const activity = useMemo(() => arr(activityRaw).slice(0, 8), [activityRaw]);
 
-  const published = num(stats.published_count);
+  const teacherMap = useMemo(() => {
+    const m = new Map<string, string>();
+    availability.forEach((t) => {
+      if (t.id && t.name) m.set(String(t.id), String(t.name));
+    });
+    return m;
+  }, [availability]);
+
+  const roomMap = useMemo(() => {
+    const m = new Map<string, string>();
+    rooms.forEach((r) => {
+      if (r.id && r.name) m.set(String(r.id), String(r.name));
+    });
+    return m;
+  }, [rooms]);
+
+  const activity = useMemo(
+    () => buildRecentActivity(arr(activityRaw), leaves, teacherMap, roomMap, 8),
+    [activityRaw, leaves, teacherMap, roomMap],
+  );
+
   const draft = num(stats.draft_count);
   const totalExams = num(stats.total_exams);
   const totalTeachers = num(stats.total_teachers);
@@ -63,7 +79,6 @@ export function AdminOverviewDashboard() {
 
   const kpis = [
     { label: "Total exams", value: totalExams, loading: reportsLoading },
-    { label: "Published duties", value: published, loading: reportsLoading },
     { label: "Draft duties", value: draft, loading: reportsLoading },
     { label: "Teachers", value: totalTeachers, loading: reportsLoading },
     { label: "Rooms", value: rooms.length, loading: roomsLoading },
@@ -81,7 +96,7 @@ export function AdminOverviewDashboard() {
         </p>
       </header>
 
-      <div className="ov-kpis">
+      <div className="ov-kpis ov-kpis--7">
         {kpis.map((k) => (
           <div className="ov-kpi" key={k.label}>
             <div className="ov-kpi__label">{k.label}</div>
@@ -122,17 +137,20 @@ export function AdminOverviewDashboard() {
           />
         </ChartCard>
 
-        <ChartCard title="Recent activity" subtitle="Latest system events">
-          {activity.length === 0 ? (
+        <ChartCard title="Recent activity" subtitle="Latest routine, allocation, and leave events" wide>
+          {activityLoading && activity.length === 0 ? (
+            <div className="ov-chart__empty">Loading recent activity…</div>
+          ) : activity.length === 0 ? (
             <div className="ov-chart__empty">No recent activity.</div>
           ) : (
             <ul className="ov-activity">
-              {activity.map((a, i) => (
-                <li key={String(a.id ?? i)}>
-                  <span className="ov-activity__dot" />
-                  <span className="ov-activity__action">{String(a.action ?? "—")}</span>
+              {activity.map((a) => (
+                <li key={a.id}>
+                  <span className="ov-activity__dot" style={{ background: a.color }} />
+                  <span className="ov-activity__action">{a.title}</span>
+                  <span className="ov-activity__detail" title={a.detail}>{a.detail}</span>
                   <span className="ov-activity__meta">
-                    {String(a.user_name ?? "System")} · {fmtTime(a.created_at)}
+                    {a.actor} · {a.time}
                   </span>
                 </li>
               ))}

@@ -58,7 +58,6 @@ export const router = createBrowserRouter([
       { path: "exams-rooms", Component: ExamsRooms },
       { path: "allocations", Component: Allocations },
       { path: "leaves", Component: LeaveRequests },
-      { path: "assistant", Component: Assistant },
       { path: "logs", Component: SuperAdminLogs },
       { path: "*", element: <Navigate to="/super-admin" replace /> },
     ],

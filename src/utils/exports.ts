@@ -643,13 +643,16 @@ export function printDoorNotices(sessions: any[], opts: { date?: string } = {}):
       const roomTd = colIdx === 0
         ? `<td class="room-cell" rowspan="${cols.length || 1}" style="vertical-align: middle; background: #fff;">${escHtml(s.room_name || "—")}</td>`
         : "";
+      const seatTd = colIdx === 0
+        ? `<td class="center" rowspan="${cols.length || 1}" style="vertical-align: middle; background: #fff; font-weight: 600;">${escHtml(s.room_capacity ?? "—")}</td>`
+        : "";
 
       rowsHtml.push(`
         <tr style="${borderBottomStyle}">
           ${roomTd}
           <td>${escHtml(s.building || "Campus")}</td>
           <td class="center">${escHtml(timeTxt)}</td>
-          <td class="center">${escHtml(s.room_capacity || "—")}</td>
+          ${seatTd}
           <td class="center" style="font-weight:700;">${escHtml(col.column_number)}</td>
           <td class="dept-cell">${col.exam ? escHtml(col.exam.dept) : "—"}</td>
           <td class="center">${col.exam ? escHtml(col.exam.batch) : "—"}</td>

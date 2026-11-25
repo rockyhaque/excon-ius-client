@@ -389,7 +389,7 @@ export function SeatingPlanPanel({ onNavigateToRoutine }: SeatingPlanPanelProps)
                         background: isEmpty ? "#fafafa" : "#ffffff",
                       }}
                     >
-                      {/* Room - Row-spanned only for Room column */}
+                      {/* Room - Row-spanned per room */}
                       {colIdx === 0 && (
                         <td
                           rowSpan={cols.length || 1}
@@ -417,10 +417,25 @@ export function SeatingPlanPanel({ onNavigateToRoutine }: SeatingPlanPanelProps)
                         {session.start_time?.slice(0, 5)} – {session.end_time?.slice(0, 5)}
                       </td>
 
-                      {/* Seat */}
-                      <td style={{ padding: "10px 12px", textAlign: "center", fontSize: 13, color: "#475569" }}>
-                        {session.room_capacity}
-                      </td>
+                      {/* Seat - Row-spanned per room (matches Room) */}
+                      {colIdx === 0 && (
+                        <td
+                          rowSpan={cols.length || 1}
+                          style={{
+                            padding: "10px 12px",
+                            textAlign: "center",
+                            fontWeight: 600,
+                            fontSize: 13,
+                            color: "#475569",
+                            verticalAlign: "middle",
+                            background: "#ffffff",
+                            borderLeft: "1px solid #e2e8f0",
+                            borderRight: "1px solid #e2e8f0",
+                          }}
+                        >
+                          {session.room_capacity}
+                        </td>
+                      )}
 
                       {/* Column */}
                       <td style={{ padding: "10px 10px", textAlign: "center", fontWeight: 700, fontSize: 13, color: isEmpty ? "#94a3b8" : "#0f172a" }}>
