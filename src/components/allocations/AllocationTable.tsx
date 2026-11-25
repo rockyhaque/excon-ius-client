@@ -1,4 +1,5 @@
 import { IconEdit } from "@/components/ui/Icons";
+import { LoadingSpinner } from "@/components/ui/Loading";
 import { fmtDate, fmtTime } from "@/components/allocations/allocations.helpers";
 import type { AllocationRow } from "@/components/allocations/allocations.types";
 
@@ -7,21 +8,23 @@ export function AllocationTable({
   isLoading,
   isError,
   onEdit,
+  emptyLabel,
 }: {
   rows: AllocationRow[];
   isLoading: boolean;
   isError: boolean;
   onEdit?: (r: AllocationRow) => void;
+  emptyLabel?: string;
 }) {
   const editable = Boolean(onEdit);
   const colCount = editable ? 8 : 7;
 
   return (
     <>
-      {isLoading ? <p className="foundations__muted">Loading…</p> : null}
+      {isLoading ? <LoadingSpinner /> : null}
       {isError ? <p className="foundations__error">Could not load allocations.</p> : null}
 
-      <div className="foundations__table-wrap">
+      {!isLoading ? <div className="foundations__table-wrap">
         <table className="foundations__table">
           <thead>
             <tr>
@@ -39,11 +42,9 @@ export function AllocationTable({
             {rows.length === 0 ? (
               <tr>
                 <td colSpan={colCount} className="foundations__empty">
-                  {isLoading
-                    ? "Loading…"
-                    : editable
-                      ? "No draft routine yet. Click “Generate routine” to build one."
-                      : "Nothing published yet."}
+                  {emptyLabel
+                    ? emptyLabel
+                    : "No draft routine yet. Click “Generate routine” to build one."}
                 </td>
               </tr>
             ) : (
@@ -98,7 +99,7 @@ export function AllocationTable({
             )}
           </tbody>
         </table>
-      </div>
+      </div> : null}
     </>
   );
 }

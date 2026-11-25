@@ -7,6 +7,7 @@ import {
 import { getAccessToken } from "@/lib/authToken";
 import config from "@/config";
 import { useAuth } from "@/hooks/useAuth";
+import { LoadingSpinner } from "@/components/ui/Loading";
 import "@/styles/assistant.css";
 
 type ChatMessage = { role: "user" | "model"; text: string; sources?: { label: string }[] };
@@ -345,7 +346,7 @@ export function AssistantChat() {
             disabled={sending || limitReached}
           />
           <button type="submit" className="btn assistant__send" disabled={sending || limitReached || !input.trim()}>
-            {sending ? "…" : "Send"}
+            {sending ? <LoadingSpinner compact light size={16} /> : "Send"}
           </button>
         </form>
         <p className="assistant__disclaimer">

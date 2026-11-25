@@ -3,12 +3,14 @@ import type { ReactNode } from "react";
 export function Table({
   head,
   children,
+  hidden = false,
 }: {
   head: ReactNode;
   children: ReactNode;
+  hidden?: boolean;
 }) {
   return (
-    <div className="foundations__table-wrap">
+    <div className="foundations__table-wrap" hidden={hidden}>
       <table className="foundations__table">
         {head}
         {children}

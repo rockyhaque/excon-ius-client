@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import { toast } from "react-toastify";
 import "@/styles/overview.css";
+import { LoadingSpinner } from "@/components/ui/Loading";
 import { Modal } from "@/components/ui/Modal";
 import { IconEdit, IconTrash } from "@/components/ui/Icons";
 import { ConfirmModal } from "@/components/ui/ConfirmModal";
@@ -287,10 +288,10 @@ export function Users() {
           </div>
         </div>
 
-        {isLoading ? <p className="foundations__muted">Loading…</p> : null}
+        {isLoading ? <LoadingSpinner /> : null}
         {error ? <p className="foundations__error">Could not load users.</p> : null}
 
-        <div className="foundations__table-wrap">
+        <div className="foundations__table-wrap" hidden={isLoading}>
           <table className="foundations__table">
             <thead>
               <tr>
@@ -302,7 +303,7 @@ export function Users() {
               </tr>
             </thead>
             <tbody>
-              {rows.length === 0 ? (
+              {!isLoading && rows.length === 0 ? (
                 <tr>
                   <td colSpan={5} className="foundations__empty">
                     No users found.

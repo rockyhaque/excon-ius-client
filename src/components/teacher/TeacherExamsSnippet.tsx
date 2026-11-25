@@ -1,4 +1,5 @@
 import "@/styles/teacher.css";
+import { LoadingSpinner } from "@/components/ui/Loading";
 import { isUpcoming } from "@/utils/stats";
 import type { PublishedAllocationRow } from "@/types/teacher";
 
@@ -55,7 +56,7 @@ export function TeacherExamsSnippet({
       {skipApi ? (
         <p className="foundations__muted">Sign in to load your duties.</p>
       ) : isLoading ? (
-        <p className="foundations__muted">Loading…</p>
+        <LoadingSpinner />
       ) : error ? (
         <p className="foundations__error">Could not load your duties.</p>
       ) : upcoming.length === 0 ? (

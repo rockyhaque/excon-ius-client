@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { toast } from "react-toastify";
 import "@/styles/overview.css";
 import "@/styles/foundations.css";
+import { LoadingSpinner } from "@/components/ui/Loading";
 import { ConfirmModal } from "@/components/ui/ConfirmModal";
 import { getErrorMessage } from "@/utils/getErrorMessage";
 import { useGetSemestersQuery, useGetDepartmentsQuery, useGetBatchesQuery } from "@/redux/features/foundations/foundations.api";
@@ -568,7 +569,7 @@ export function ExamRoutinePanel({ onOpenSeating }: ExamRoutinePanelProps = {}) 
         </div>
       </div>
 
-      {isLoading ? <p className="foundations__muted">Loading…</p> : null}
+      {isLoading ? <LoadingSpinner /> : null}
       {error ? <p className="foundations__error">Could not load the routine.</p> : null}
       {!isLoading && semesterId && rows.length === 0 ? (
         <div className="foundations__empty" style={{ border: "1px solid #e5e7eb", borderRadius: 12, background: "#fff" }}>

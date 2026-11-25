@@ -1,4 +1,5 @@
 import "@/styles/overview.css";
+import { LoadingSpinner } from "@/components/ui/Loading";
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "react-toastify";
 import { useGetExamsQuery } from "@/redux/features/exam-room/examRoom.api";
@@ -163,7 +164,7 @@ export function TeacherSchedulePanel() {
           </div>
         </div>
 
-        {isLoading ? <p className="foundations__muted">Loading…</p> : null}
+        {isLoading ? <LoadingSpinner /> : null}
         {error ? <p className="foundations__error">Could not load the exam schedule.</p> : null}
         {!isLoading && !error && viewRows.length === 0 ? (
           <div className="foundations__empty" style={{ border: "1px solid #e5e7eb", borderRadius: 12, background: "#fff" }}>

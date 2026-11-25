@@ -1,4 +1,5 @@
 import { useMemo, useState, useEffect } from "react";
+import { LoadingSpinner } from "@/components/ui/Loading";
 import { toast } from "react-toastify";
 import "@/styles/overview.css";
 import "@/styles/foundations.css";
@@ -300,9 +301,7 @@ export function SeatingPlanPanel({ onNavigateToRoutine }: SeatingPlanPanelProps)
 
       {/* Main Seating Content */}
       {isLoading ? (
-        <div style={{ padding: 40, textAlign: "center", color: "#64748b" }}>
-          Loading seating allocations…
-        </div>
+        <LoadingSpinner />
       ) : error ? (
         <div className="foundations__error" style={{ padding: 20 }}>
           Could not load the seating plan. Please verify that the server is reachable.

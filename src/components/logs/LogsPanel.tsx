@@ -1,4 +1,5 @@
 import { useMemo, useState, type ReactNode } from "react";
+import { LoadingSpinner } from "@/components/ui/Loading";
 import {
   useGetActivityLogsQuery,
   useGetAdminActionLogsQuery,
@@ -218,10 +219,10 @@ export function LogsPanel() {
           ))}
         </div>
 
-        {q.isLoading ? <p className="foundations__muted">Loading…</p> : null}
+        {q.isLoading ? <LoadingSpinner /> : null}
         {q.error ? <p className="foundations__error">Could not load logs.</p> : null}
 
-        <div className="foundations__table-wrap">
+        <div className="foundations__table-wrap" hidden={q.isLoading}>
           <table className="foundations__table">
             <thead>
               <tr>
@@ -233,10 +234,10 @@ export function LogsPanel() {
               </tr>
             </thead>
             <tbody>
-              {rows.length === 0 ? (
+              {!q.isLoading && rows.length === 0 ? (
                 <tr>
                   <td colSpan={cols.length} className="foundations__empty">
-                    {q.isLoading ? "Loading…" : "No log entries."}
+                    No log entries.
                   </td>
                 </tr>
               ) : (

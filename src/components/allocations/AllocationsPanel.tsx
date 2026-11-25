@@ -1,9 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "react-toastify";
-import "@/styles/overview.css";
 import { getErrorMessage } from "@/utils/getErrorMessage";
-import { ChartCard, DonutChart, HBarList, VIZ } from "@/components/overview/charts";
-import { countBy } from "@/utils/stats";
+import { VIZ } from "@/components/overview/charts";
 import {
   useEditAllocationMutation,
   useGetAiAllocationQuery,
@@ -16,7 +14,7 @@ import {
   useTriggerAiAllocationMutation,
 } from "@/redux/features/allocations/allocations.api";
 import { useGetRoomsQuery } from "@/redux/features/exam-room/examRoom.api";
-import { mapAllocations, mapWorkload, type AllocationRow } from "@/components/allocations/allocations.types";
+import { mapAllocations, type AllocationRow } from "@/components/allocations/allocations.types";
 import type { PublishedAllocationRow } from "@/types/teacher";
 import {
   allocationCsv,
@@ -76,12 +74,6 @@ export function AllocationsPanel() {
   const stats = reports?.stats as Record<string, unknown> | undefined;
   const activeRows = tab === "draft" ? draftRows : publishedRows;
 
-  const totalExams = toCount(stats?.total_exams);
-  const publishedExams = toCount(stats?.published_exams);
-  const allocatedExams = toCount(stats?.allocated_exams);
-  const draftOnlyExams = Math.max(0, allocatedExams - publishedExams);
-  const unassigned = Math.max(0, totalExams - allocatedExams);
-
   const teachersUtilized = useMemo(
     () => new Set(activeRows.map((r) => r.teacher_id).filter(Boolean)).size,
     [activeRows],
@@ -93,26 +85,6 @@ export function AllocationsPanel() {
           .filter((r) => r.room_capacity != null && r.expected_students != null && r.expected_students > r.room_capacity)
           .map((r) => r.room_id),
       ).size,
-    [activeRows],
-  );
-
-  const workloadBars = useMemo(() => {
-    return mapWorkload(reports?.workload)
-      .filter((w) => w.name)
-      .slice()
-      .sort((a, b) => b.current_allocations - a.current_allocations)
-      .slice(0, 12)
-      .map((w) => {
-        const cur = w.current_allocations;
-        const lim = w.limit_value;
-        const color =
-          lim > 0 && cur >= lim ? VIZ.critical : lim > 0 && cur >= 0.8 * lim ? VIZ.warning : VIZ.blue;
-        return { id: w.id, label: w.name, value: cur, sub: `/ ${lim}`, color };
-      });
-  }, [reports]);
-
-  const dutiesPerRoom = useMemo(
-    () => countBy(activeRows, (r) => r.room_name, 12),
     [activeRows],
   );
 
@@ -414,27 +386,6 @@ export function AllocationsPanel() {
           </div>
         ) : null}
 
-        <div className="ov-grid" style={{ marginBottom: 16 }}>
-          <ChartCard title="Duty coverage" subtitle="Exams by allocation state">
-            <DonutChart
-              centerLabel="exams"
-              data={[
-                { label: "Published", value: publishedExams, color: VIZ.good },
-                { label: "Draft only", value: draftOnlyExams, color: VIZ.warning },
-                { label: "Unassigned", value: unassigned, color: VIZ.neutral },
-              ]}
-            />
-          </ChartCard>
-
-          <ChartCard title="Invigilation workload" subtitle="Duties assigned per teacher (vs limit)">
-            <HBarList data={workloadBars} unit="duties" />
-          </ChartCard>
-
-          <ChartCard title={`Duties per room (${tab})`} subtitle="Where the current routine sits">
-            <HBarList data={dutiesPerRoom} unit="duties" color={VIZ.orange} />
-          </ChartCard>
-        </div>
-
         <div className="foundations__toolbar">
           <div className="foundations__toolbar-left">
             <label style={{ display: "inline-flex", alignItems: "center", gap: 8, fontSize: 13, fontWeight: 500, color: "#475569" }}>
@@ -527,20 +478,13 @@ export function AllocationsPanel() {
           </button>
         </div>
 
-        {tab === "draft" ? (
-          <AllocationTable
-            rows={displayedRows}
-            isLoading={draftQuery.isLoading}
-            isError={Boolean(draftQuery.error)}
-            onEdit={openEdit}
-          />
-        ) : (
-          <AllocationTable
-            rows={displayedRows}
-            isLoading={publishedQuery.isLoading}
-            isError={Boolean(publishedQuery.error)}
-          />
-        )}
+        <AllocationTable
+          rows={displayedRows}
+          isLoading={tab === "draft" ? draftQuery.isLoading : publishedQuery.isLoading}
+          isError={tab === "draft" ? Boolean(draftQuery.error) : Boolean(publishedQuery.error)}
+          onEdit={openEdit}
+          emptyLabel={tab === "published" ? "Nothing published yet." : undefined}
+        />
       </div>
 
       <ReassignAllocationModal

@@ -1,5 +1,6 @@
 import { useState } from "react";
 import "@/styles/teacher.css";
+import { LoadingSpinner } from "@/components/ui/Loading";
 import { Modal } from "@/components/ui/Modal";
 import { ConfirmModal } from "@/components/ui/ConfirmModal";
 import { Tabs } from "@/components/ui/Tabs";
@@ -113,10 +114,11 @@ export function TeacherLeavesPanel() {
         {tab === "list" ? (
           <>
             {skipApi ? <p className="foundations__muted">Sign in to load your leave history.</p> : null}
-            {!skipApi && isLoading ? <p className="foundations__muted">Loading…</p> : null}
+            {!skipApi && isLoading ? <LoadingSpinner /> : null}
             {!skipApi && error ? <p className="foundations__error">Could not load leave history.</p> : null}
 
             <Table
+              hidden={!skipApi && isLoading}
               head={
                 <thead>
                   <tr>

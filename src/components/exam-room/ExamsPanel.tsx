@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "react-toastify";
 import "@/styles/overview.css";
+import { LoadingSpinner } from "@/components/ui/Loading";
 import { Modal } from "@/components/ui/Modal";
 import { ConfirmModal } from "@/components/ui/ConfirmModal";
 import { IconEdit, IconTrash } from "@/components/ui/Icons";
@@ -206,7 +207,7 @@ export function ExamsPanel() {
         </div>
       </div>
 
-      {isLoading ? <p className="foundations__muted">Loading…</p> : null}
+      {isLoading ? <LoadingSpinner /> : null}
       {error ? <p className="foundations__error">Could not load exams.</p> : null}
 
       {rows.length > 0 ? (
@@ -232,7 +233,7 @@ export function ExamsPanel() {
         </>
       ) : null}
 
-      <div className="foundations__table-wrap">
+      <div className="foundations__table-wrap" hidden={isLoading}>
         <table className="foundations__table">
           <thead>
             <tr>
@@ -248,7 +249,7 @@ export function ExamsPanel() {
             </tr>
           </thead>
           <tbody>
-            {rows.length === 0 ? (
+            {!isLoading && rows.length === 0 ? (
               <tr>
                 <td colSpan={9} className="foundations__empty">
                   No exams yet.

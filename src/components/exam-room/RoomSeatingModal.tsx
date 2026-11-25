@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { LoadingSpinner } from "@/components/ui/Loading";
 import { Modal } from "@/components/ui/Modal";
 import { useGetExamSeatingQuery } from "@/redux/features/exam-room/examRoom.api";
 import { printDoorNotices } from "@/utils/exports";
@@ -96,7 +97,7 @@ export function RoomSeatingModal({ open, onClose, semesterId }: RoomSeatingModal
         </div>
 
         {isLoading ? (
-          <p className="foundations__muted">Loading seating arrangements…</p>
+          <LoadingSpinner />
         ) : filteredSessions.length === 0 ? (
           <div className="foundations__empty" style={{ padding: "30px 0" }}>
             No column seating records generated yet. Generate an exam routine first.

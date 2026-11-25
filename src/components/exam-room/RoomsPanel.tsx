@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import { toast } from "react-toastify";
 import "@/styles/overview.css";
+import { LoadingSpinner } from "@/components/ui/Loading";
 import { Modal } from "@/components/ui/Modal";
 import { ConfirmModal } from "@/components/ui/ConfirmModal";
 import { IconEdit, IconTrash } from "@/components/ui/Icons";
@@ -227,7 +228,7 @@ export function RoomsPanel() {
         </div>
       </div>
 
-      {isLoading ? <p className="foundations__muted">Loading…</p> : null}
+      {isLoading ? <LoadingSpinner /> : null}
       {error ? <p className="foundations__error">Could not load rooms.</p> : null}
 
       {rows.length > 0 ? (
@@ -339,7 +340,7 @@ export function RoomsPanel() {
         </>
       ) : null}
 
-      <div className="foundations__table-wrap">
+      <div className="foundations__table-wrap" hidden={isLoading}>
         <table className="foundations__table">
           <thead>
             <tr>
@@ -352,7 +353,7 @@ export function RoomsPanel() {
             </tr>
           </thead>
           <tbody>
-            {filteredRows.length === 0 ? (
+            {!isLoading && filteredRows.length === 0 ? (
               <tr>
                 <td colSpan={6} className="foundations__empty">
                   {hasFilters ? "No rooms match the selected filters." : "No rooms yet."}

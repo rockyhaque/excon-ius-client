@@ -1,4 +1,5 @@
 import "@/styles/teacher.css";
+import { LoadingSpinner } from "@/components/ui/Loading";
 import type { TeacherProfile } from "@/types/teacher";
 
 function fmt(v: string | null | undefined) {
@@ -22,7 +23,7 @@ export function TeacherProfileCard({
           <div className="foundations__page-head">
             <div>
               <h2>Profile</h2>
-              <p className="foundations__muted">Loading profile…</p>
+              <LoadingSpinner />
             </div>
           </div>
         </div>
